@@ -6,16 +6,18 @@
 ## 安装
 
 ```sh
-# 进入临时目录
-cd /tmp/
 # 下载并解包
-wget -O - https://github.com/shuxs/xunlei-from-symo/releases/download/v2.1.0/xunlei-from-syno.x86_64.tar.gz | tar zx
+wget -O - https://github.com/shuxs/xunlei-from-syno/releases/download/v2.1.0/xunlei-from-syno.v2.1.0.x86_64.tar.gz | tar zx
+
+# 国内可用
+wget -O - https://github.91chi.fun//https://github.com//shuxs/xunlei-from-syno/releases/download/v2.1.0/xunlei-from-syno.v2.1.0.x86_64.tar.gz | tar zx
+
 # 安装
 ./xunlei-from-syno install && rm -f ./xunlei-from-syno
 # 安装完成之后就可以用 http://你设备的IP:2345 来访问了。
 ```
 
-[也可以下载编译好的程序自行琢磨](https://github.com/shuxs/xunlei-from-symo/releases/download/v2.1.0/xunlei-from-syno.v2.1.0.x86_64.tar.gz) 
+[也可以下载自行琢磨](https://github.com/shuxs/xunlei-from-syno/releases) 
 
 ## 控制
 
