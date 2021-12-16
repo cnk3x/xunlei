@@ -1,0 +1,13 @@
+services:
+  xunlei:
+    build: .
+    image: xunlei
+    container_name: xunlei
+    volumes:
+      - /mnt:/mnt
+      - ./config:/var/packages/pan-xunlei-com/shares
+      - ./downloads:/downloads
+    network_mode: bridge
+    ports:
+      - 2345:2345
+    privileged: true
