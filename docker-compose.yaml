@@ -1,8 +1,8 @@
 services:
-  xunlei:
+  xunlei-from-syno:
     build: .
-    image: xunlei
-    container_name: xunlei
+    image: xunlei-from-syno
+    container_name: xunlei-from-syno
     volumes:
       - /mnt:/mnt
       - ./config:/var/packages/pan-xunlei-com/shares

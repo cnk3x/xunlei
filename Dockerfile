@@ -1,9 +1,16 @@
+FROM golang as build
+
+COPY . .
+
+ENV GOPROXY=https://goproxy.cn
+RUN go build -o /xunlei-from-syno ./
+
 FROM ubuntu
 
+COPY --from=build /xunlei-from-syno /xunlei-from-syno
+COPY host /var/packages/pan-xunlei-com/host
 COPY target /var/packages/pan-xunlei-com/target
-COPY xunlei-linux /xunlei-linux
-COPY host  /var/packages/pan-xunlei-com/host
 
-VOLUME [ "/var/packages/pan-xunlei-com/shares" ]
+VOLUME [ "/var/packages/pan-xunlei-com/shares", "/downloads" ]
 
-CMD [ "/xunlei-linux" ]
+CMD [ "/xunlei-from-syno", "run", "--port=2345", "--download-dir=/downloads" ]
