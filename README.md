@@ -11,10 +11,17 @@ wget -O - https://github.com/shuxs/xunlei-from-syno/releases/download/v2.1.0/xun
 
 # 国内可用
 wget -O - https://github.91chi.fun//https://github.com//shuxs/xunlei-from-syno/releases/download/v2.1.0/xunlei-from-syno.v2.1.0.x86_64.tar.gz | tar zx
+# 上面二者用其一即可
 
 # 安装
 ./xunlei-from-syno install && rm -f ./xunlei-from-syno
 # 安装完成之后就可以用 http://你设备的IP:2345 来访问了。
+
+# 卸载
+/var/packages/pan-xunlei-com/xunlei-from-syno clean
+rm -rf /var/packages/pan-xunlei-com
+rm -f /etc/systemd/system/xunlei-from-syno.service
+# 除了你的下载文件夹之外，没有来过的痕迹了。
 ```
 
 [也可以下载自行琢磨](https://github.com/shuxs/xunlei-from-syno/releases) 
@@ -41,9 +48,16 @@ systemctl status xunlei-from-syno
 4. 设置 `xunlei-from-syno` 服务开机自启
 5. 启动 `xunlei-from-syno` 服务
 
-> 默认配置，请确保不会冲突
-1. 下载目录: `/downloads`, 如需改用其他目录，请自行编辑服务文件
-2. 网页端口: `2345`, 如需改用其他目录，请自行编辑服务文件
+## 配置
+> 请确保不会冲突
+1. 默认下载目录: `/downloads`
+2. 默认网页端口: `2345`
+3. 修改配置
+    1. 停止服务 `systemctl stop xunlei-from-syno`
+    2. 编辑服务 `vi /etc/systemd/system/xunlei-from-syno.service` 或者 `nano /etc/systemd/system/xunlei-from-syno.service`
+    3. 修改 `ExecStart=/var/packages/pan-xunlei-com/xunlei-from-syno run --port=你要的网页端口 --download-dir=你要的下载目录`
+    3. 重载服务 `systemctl daemon-reload`
+    4. 启动服务 `systemctl start xunlei-from-syno`
 
 ```ini
 # 服务文件
