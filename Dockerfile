@@ -1,8 +1,10 @@
 FROM golang as build
 
+WORKDIR /sources/
+
 COPY . .
 
-ENV GOPROXY=https://goproxy.cn
+ENV GOPROXY=https://goproxy.cn GO111MODULE=on
 RUN go build -o /xunlei-from-syno ./
 
 FROM ubuntu

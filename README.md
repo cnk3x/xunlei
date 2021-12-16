@@ -66,6 +66,14 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 [Install]
 WantedBy=multi-user.target
 ```
+## 关于Docker容器
+
+> 代码中我写好 [Dockefile](https://github.com/shuxs/xunlei-from-syno/blob/main/Dockerfile) 和 [docker-compose.yaml](https://github.com/shuxs/xunlei-from-syno/blob/main/docker-compose.yaml), 能够跑起来，但登录账号后，输入邀请码的时候出现权限的提示，估计是需要docker平台的邀请码. 
+
+```sh
+docker compose build
+docker compose up -d && docker compose logs -f
+```
 
 ## 交流
 

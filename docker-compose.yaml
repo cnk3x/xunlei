@@ -9,5 +9,5 @@ services:
       - ./downloads:/downloads
     network_mode: bridge
     ports:
-      - 2345:2345
+      - 5432:2345
     privileged: true
