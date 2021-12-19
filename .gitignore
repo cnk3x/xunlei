@@ -1,7 +1,5 @@
 bin/
-/host/etc/
-/host/usr/
-/target/bin/
-/target/ui/
-/target/*.sh
 .drive/
+tmp/
+/xunlei-from-syno
+/xunlei
