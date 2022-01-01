@@ -152,6 +152,7 @@ WantedBy=multi-user.target`, c.Description)
 	}
 	_ = serviceControlSilence("daemon-reload")(ctx)
 	_ = serviceControlSilence("enable", appname)(ctx)
+	_ = serviceControlSilence("start", appname)(ctx)
 	return nil
 }
 
