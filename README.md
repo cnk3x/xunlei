@@ -9,8 +9,10 @@
 
 ```sh
 # 安装
-sh -c $(curl -fSsL https://gh.k3x.cn/raw/cnk3x/xunlei/main/install.sh) install
+sh -c "$(curl -fSsL https://gh.k3x.cn/raw/cnk3x/xunlei/main/install.sh)" - install --port=2345 --download-dir=/download
 
 # 卸载
-/var/packages/pan-xunlei-com/xunlei uninstall
+sh -c "$(curl -fSsL https://gh.k3x.cn/raw/cnk3x/xunlei/main/install.sh)" - uninstall
+
+# 有时候安装失败，可以先运行卸载一次，再安装
 ```
