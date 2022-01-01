@@ -8,4 +8,4 @@ rm -f "/usr/syno/synoman/webman/modules/authenticate.cgi"
 rm -f "/etc/synoinfo.conf"
 rm -fr "/var/packages/pan-xunlei-com"
 
-echo 操作完成
+echo 操作结束
