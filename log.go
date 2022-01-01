@@ -45,7 +45,6 @@ func (l *std) output(tag, format string, args ...interface{}) {
 	sPrinter := fmt.Sprintf
 	switch tag {
 	case "DEBU":
-		sPrinter = color.BlackString
 	case "INFO":
 		sPrinter = color.GreenString
 	case "WARN":
