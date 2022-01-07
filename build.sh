@@ -13,5 +13,5 @@ fi
 
 tgz="xunlei-v${version}.$(uname | tr 'A-Z' 'a-z').$(uname -m).tar.gz"
 echo $tgz
-tar -C bin -cf bin/$tgz xunlei
+tar -C bin -zcf bin/$tgz xunlei
 tar -tf bin/$tgz
