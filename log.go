@@ -5,8 +5,6 @@ import (
 	"io"
 	"os"
 	"sync"
-
-	"github.com/fatih/color"
 )
 
 type Logger interface {
@@ -43,15 +41,15 @@ func (l *std) output(tag, format string, args ...interface{}) {
 	}
 
 	sPrinter := fmt.Sprintf
-	switch tag {
-	case "DEBU":
-	case "INFO":
-		sPrinter = color.GreenString
-	case "WARN":
-		sPrinter = color.BlueString
-	case "FATA":
-		sPrinter = color.RedString
-	}
+	// switch tag {
+	// case "DEBU":
+	// case "INFO":
+	// 	sPrinter = color.GreenString
+	// case "WARN":
+	// 	sPrinter = color.BlueString
+	// case "FATA":
+	// 	sPrinter = color.RedString
+	// }
 
 	// prefix := sPrinter("[%s] ", tag) + time.Now().Format(time.RFC3339) + sPrinter(" [%s] ", l.prefix)
 	fmt.Fprintf(l.out, sPrinter("[%s] ", l.prefix)+format+"\n", args...)
