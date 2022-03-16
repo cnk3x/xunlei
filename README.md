@@ -14,8 +14,8 @@ sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com
 # 上面命令后面的参数 --port=后面接端口号, --download-dir=接下载文件夹，按自己的需求改
 # 下载文件夹装好后没得改了，要改的话，卸载重装，或者用软链接
 # 有时候安装失败，可以先运行卸载一次，再安装
-# 启动后，浏览器访问你的设备地址+端口号绑定迅雷就可以了。
-# 当前版本支持迅雷官方公测前的在线更新(不需要重新状态)
+# 启动后，浏览器访问你的设备地址+端口号绑定迅雷就可以了。 比如： http://192.168.3.11:2345
+# 当前版本支持迅雷官方公测前的在线更新(不需要重新安装)
 
 # 卸载
 sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall.sh)"
@@ -33,6 +33,10 @@ systemctl status xunlei
 # 查看日志(ctrl+c退出日志查看)
 journalctl -fu xunlei
 ```
+
+## 更新
+
+使用应用内更新的功能
 
 ## 自行编译
 
