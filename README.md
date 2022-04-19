@@ -10,7 +10,7 @@
 
 ```sh
 # 安装
-sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com/cnk3x/xunlei/main/install.sh)" - install --port=2345 --download-dir=/download
+sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/install.sh)" - install --port=2345 --download-dir=/download
 # 上面命令后面的参数 --port=后面接端口号, --download-dir=接下载文件夹，按自己的需求改
 # 下载文件夹装好后没得改了，要改的话，卸载重装，或者用软链接
 # 有时候安装失败，可以先运行卸载一次，再安装
@@ -18,10 +18,10 @@ sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com
 # 当前版本支持迅雷官方公测前的在线更新(不需要重新安装)
 
 # 卸载
-sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall.sh)"
+sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall.sh)"
 
 # 卸载旧版本v2.1.x
-sh -c "$(curl -fSsL https://mirror.ghproxy.com/https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall_old.sh)"
+sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall_old.sh)"
 
 # 服务控制
 # 启动
