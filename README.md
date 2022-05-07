@@ -49,3 +49,49 @@ journalctl -fu xunlei
 1. 将 `index.cgi` 改名为 `xunlei-pan-cli-web`
 1. 将这四个文件复制到源码target目录
 1. 改你要改的，改完后编译。
+
+## Docker
+
+
+### docker shell
+
+```bash
+docker run -d --name=xunlei \
+  # 主机名，迅雷以此"群晖-主机名"来命名远程设备
+  --hostname=my-nas-1
+  # 设置为host下载会快一些
+  # --net=host \
+  --net=bridge \
+  -p=2345:2345 \
+  -v=<数据目录>:/xunlei/data \
+  -v=<下载目录>:/xunlei/downloads \
+  --restart=always \
+  cnk3x/xlp:latest
+```
+
+### docker compose
+
+```yaml
+# compose.yml
+services:
+  xunlei:
+    image: cnk3x/xunlei:latest
+    container_name: xunlei
+    # 主机名，迅雷以此"群晖-主机名"来命名远程设备
+    hostname: my-nas-1
+    # 设置为host下载会快一些
+    # network_mode: host
+    network_mode: bridge
+    ports:
+      - "2345:2345"
+    volumes:
+      - ./data:/xunlei/data
+      - <下载目录>:/xunlei/downloads
+    restart: always
+```
+
+默认网页管理端口 2345，如果要指定端口
+- host网络: 通过指定命令 `docker run ... cnk3x/xunlei:latest xlp -port 5050` 改用 5050 端口
+- bridge网络: 绑定时 `docker run ... -p 5050:2345 cnk3x/xunlei:latest` 改用 5050 端口
+
+删除<数据目录>重启容器需要重新绑定
