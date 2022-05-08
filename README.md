@@ -54,6 +54,8 @@ journalctl -fu xunlei
 
 [代码](https://github.com/cnk3x/xunlei/tree/docker)
 
+[hub](https://hub.docker.com/r/cnk3x/xunlei)
+
 ### docker shell
 
 ```bash
