@@ -1,0 +1,17 @@
+# compose.yml
+services:
+  xunlei:
+    image: cnk3x/xunlei:latest
+    build: .
+    container_name: xunlei
+    # 主机名，迅雷以此"群晖-主机名"来命名远程设备
+    hostname: my-nas-1
+    # 设置为host下载会快一些
+    # network_mode: host
+    network_mode: bridge
+    ports:
+      - "2345:2345"
+    volumes:
+      - ./data:/xunlei/data
+      - ./downloads:/xunlei/downloads
+    restart: always
