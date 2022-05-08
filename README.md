@@ -71,6 +71,8 @@ docker run -d --name=xunlei \
 
 ### docker compose
 
+x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机器，暂时未测。
+
 ```yaml
 # compose.yml
 services:
