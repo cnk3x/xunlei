@@ -52,6 +52,8 @@ journalctl -fu xunlei
 
 ## Docker
 
+x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机器，暂时未测。
+
 [代码](https://github.com/cnk3x/xunlei/tree/docker)
 
 [hub](https://hub.docker.com/r/cnk3x/xunlei)
@@ -69,12 +71,10 @@ docker run -d --name=xunlei \
   -v=<数据目录>:/xunlei/data \
   -v=<下载目录>:/xunlei/downloads \
   --restart=always \
-  cnk3x/xlp:latest
+  cnk3x/xunlei:latest
 ```
 
 ### docker compose
-
-x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机器，暂时未测。
 
 ```yaml
 # compose.yml
