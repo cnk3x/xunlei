@@ -19,7 +19,7 @@ RUN tar Oxvf ./spk/xunlei-${TARGETARCH}.spk package.tgz | \
 
 RUN ldd ${XTARGET}/bin/* ${XTARGET}/ui/* | grep -v dynamic | grep '=>' | cut -d ' ' -f3 | sed 's/://g' | sort | uniq | xargs -I {} cp --parents {} /xunlei
 RUN if [ "${TARGETARCH}" = "amd64" ]; then cp --parents /lib64/ld-linux-x86-64.so.* /xunlei; fi
-RUN if [ "${TARGETARCH}" = "arm64" ]; then cp --parents /lib/ld-linux-aarch64.so.* /xunlei; fi
+RUN if [ "${TARGETARCH}" = "arm64" ]; then cp --parents /lib/ld-linux-aarch64.so.* /lib/aarch64-linux-gnu/libpthread.so.* /lib/aarch64-linux-gnu/libc.so.* /xunlei; fi
 
 COPY src .
 RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct 
@@ -42,12 +42,11 @@ FROM busybox
 COPY --from=bb1 / /xunlei/
 
 RUN mv /xunlei/xlp /xlp && \
-    mknod /xunlei/dev/null c 1 3 && \
-    mknod /xunlei/dev/zero c 1 5 && \
-    mknod /xunlei/dev/tty  c 5 0 && \
-    chmod 0666 /xunlei/dev/null && \
-    chmod 0666 /xunlei/dev/tty && \
-    chmod 0666 /xunlei/dev/zero && \
+    mknod -m 666 /xunlei/dev/null c 1 3 && \
+    mknod -m 666 /xunlei/dev/zero c 1 5 && \
+    mknod -m 666 /xunlei/dev/tty  c 5 0 && \
+    mknod -m 666 /xunlei/dev/random c 1 8 && \
+    mknod -m 666 /xunlei/dev/urandom c 1 9 && \
     chown root.tty /xunlei/dev/tty && \
     echo "127.0.0.1 localhost" > /xunlei/etc/hosts && \
     echo "nameserver 114.114.114.114" > /xunlei/etc/resolv.conf && \
@@ -58,6 +57,6 @@ RUN mv /xunlei/xlp /xlp && \
 # COPY --from=bb2 /xunlei /xunlei
 # COPY --from=bb2 /xlp /xlp
 
-VOLUME [ "/data", "/downloads" ]
+VOLUME [ "/xunlei/data", "/xunlei/downloads" ]
 
 CMD [ "/xlp", "-port=2345" ]
