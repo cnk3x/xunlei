@@ -4,9 +4,9 @@
 
 x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机器，暂时未测。
 
-[代码](https://github.com/cnk3x/xunlei/tree/docker)
+[源码](https://github.com/cnk3x/xunlei/tree/docker)
 
-[hub](https://hub.docker.com/r/cnk3x/xunlei)
+[Docker Hub](https://hub.docker.com/r/cnk3x/xunlei)
 
 ## 安装
 
