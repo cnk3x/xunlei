@@ -6,12 +6,16 @@ services:
     container_name: xunlei
     # 主机名，迅雷以此"群晖-主机名"来命名远程设备
     hostname: my-nas-1
-    # 设置为host下载会快一些
+    environment:
+      - XL_DEBUG=1
+    # 如果要更改Web访问端口，取消下面注释并修改端口号
+    # - XL_WEB_PORT=2345
+    # 设置为host下载会好一些
     # network_mode: host
     network_mode: bridge
     ports:
       - "2345:2345"
     volumes:
-      - ./data:/xunlei/data
-      - ./downloads:/xunlei/downloads
+      - ./tmp/data:/data
+      - ./tmp/downloads:/downloads
     restart: always

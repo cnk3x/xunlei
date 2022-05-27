@@ -8,7 +8,6 @@ x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机�
 
 [hub](https://hub.docker.com/r/cnk3x/xunlei)
 
-
 ## 安装
 
 ### docker shell
@@ -16,14 +15,24 @@ x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机�
 ```bash
 docker run -d --name=xunlei \
   # 主机名，迅雷以此"群晖-主机名"来命名远程设备
-  --hostname=my-nas-1
-  # 设置为host下载会快一些
+  --hostname=my-nas-1 \
+  # 设置为host下载会好一些
   # --net=host \
-  --net=bridge \
+  # 开启调试模式会显示所有的迅雷日志，很多很多，正常使用时候不建议开启
+  # -e XL_DEBUG=1 \
   -p=2345:2345 \
   -v=<数据目录>:/xunlei/data \
   -v=<下载目录>:/xunlei/downloads \
   --restart=always \
+  cnk3x/xunlei:latest
+
+docker run --rm --name=xunlei \
+  --hostname=WenUNAS \
+  -e XL_DEBUG=1 \
+  -p=2345:2345 \
+  -v=/mnt/nas/data/apps/xunlei/data:/data \
+  -v=/mnt/nas/data/downloads:/xunlei/downloads \
+  -v=/mnt/nas/data/media/:/xunlei/downloads/media \
   cnk3x/xunlei:latest
 ```
 

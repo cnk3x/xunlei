@@ -1,62 +1,39 @@
-FROM golang:1.18.1 as builder
+FROM golang:1.18.2 as builder
 
 ARG TARGETARCH
+ENV DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
+RUN if [ "${TARGETARCH}" != "arm64" -a "${TARGETARCH}" != "amd64" ]; then echo "arch ${TARGETARCH} is not supported"; exit 1; fi
 
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-    sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install upx-ucl xz-utils ca-certificates tzdata
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+RUN apt-get update && apt-get -y --no-install-recommends install ca-certificates xz-utils
 
-WORKDIR /app
+COPY spk /spk
+RUN targetDIR=/var/packages/pan-xunlei-com/target; mkdir -p ${targetDIR}; \
+    if [ "$(uname -m)" = "aarch64" ]; then arch=armv8; else arch=$(uname -m); fi; \
+    tar --wildcards -Oxf $(find /spk -type f -name \*-${arch}.spk | head -n1) package.tgz | tar --wildcards -xJC ${targetDIR} 'bin/bin/*' 'ui/index.cgi'; \
+    mv ${targetDIR}/bin/bin/* ${targetDIR}/bin; rm -rf ${targetDIR}/bin/bin
 
-ENV XTARGET=/xunlei/var/packages/pan-xunlei-com/target
-COPY spk/xunlei-${TARGETARCH}.spk ./spk/
-RUN mkdir -p ${XTARGET}
-RUN tar Oxvf ./spk/xunlei-${TARGETARCH}.spk package.tgz | \
-    tar --wildcards -xvJC ${XTARGET} 'bin/bin/*' 'ui/index.cgi' && \
-    mv ${XTARGET}/bin/bin/* ${XTARGET}/bin && \
-    rm -rf ${XTARGET}/bin/bin
+WORKDIR /go/xlp
+COPY xlp .
+RUN GO111MODULE=on GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 go build -v -ldflags '-s -w -extldflags "-static"' ./
 
-RUN ldd ${XTARGET}/bin/* ${XTARGET}/ui/* | grep -v dynamic | grep '=>' | cut -d ' ' -f3 | sed 's/://g' | sort | uniq | xargs -I {} cp --parents {} /xunlei
-RUN if [ "${TARGETARCH}" = "amd64" ]; then cp --parents /lib64/ld-linux-x86-64.so.* /xunlei; fi
-RUN if [ "${TARGETARCH}" = "arm64" ]; then cp --parents /lib/ld-linux-aarch64.so.* /lib/aarch64-linux-gnu/libpthread.so.* /lib/aarch64-linux-gnu/libc.so.* /xunlei; fi
+RUN mkdir -p /rootfs/xunlei && \
+    cp --parents /etc/ssl/certs/ca-certificates.crt /rootfs && \
+    cp -r --parents /var/packages/pan-xunlei-com/target /rootfs && \
+    cp /go/xlp/xlp /rootfs/xunlei/xlp
 
-COPY src .
-RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct 
-RUN CGO_ENABLED=0 go build -a -v -ldflags '-s -w -extldflags "-static"' -o /xunlei/xlp 
-RUN upx /xunlei/xlp
+FROM ubuntu:18.04 as rootfs
+RUN sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list
+COPY --from=builder /rootfs /
 
-FROM busybox as bb1
+# FROM busybox
+# COPY --from=rootfs /var/packages /var/packages
+# COPY --from=rootfs /xunlei /xunlei
+# COPY --from=rootfs /lib /lib
+# COPY --from=rootfs /lib64 /lib64
+# COPY --from=rootfs /usr/lib /usr/lib
 
-COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=builder /xunlei /
-
-RUN mkdir -p /usr/syno/synoman/webman/modules && \
-    echo "#!/bin/sh" > /usr/syno/synoman/webman/modules/authenticate.cgi && \
-    echo "echo OK" >> /usr/syno/synoman/webman/modules/authenticate.cgi && \
-    chmod +x /usr/syno/synoman/webman/modules/authenticate.cgi
-
-FROM busybox
-
-COPY --from=bb1 / /xunlei/
-
-RUN mv /xunlei/xlp /xlp && \
-    mknod -m 666 /xunlei/dev/null c 1 3 && \
-    mknod -m 666 /xunlei/dev/zero c 1 5 && \
-    mknod -m 666 /xunlei/dev/tty  c 5 0 && \
-    mknod -m 666 /xunlei/dev/random c 1 8 && \
-    mknod -m 666 /xunlei/dev/urandom c 1 9 && \
-    chown root.tty /xunlei/dev/tty && \
-    echo "127.0.0.1 localhost" > /xunlei/etc/hosts && \
-    echo "nameserver 114.114.114.114" > /xunlei/etc/resolv.conf && \
-    echo "search lan" >> /xunlei/etc/resolv.conf && \
-    echo "Asia/Shanghai" > /xunlei/etc/timezone
-
-# FROM scratch
-# COPY --from=bb2 /xunlei /xunlei
-# COPY --from=bb2 /xlp /xlp
-
-VOLUME [ "/xunlei/data", "/xunlei/downloads" ]
-
-CMD [ "/xlp", "-port=2345" ]
+ENV XL_WEB_PORT=2345 XL_DEBUG=1
+EXPOSE 2345
+VOLUME [ "/data", "/downloads" ]
+ENTRYPOINT [ "/xunlei/xlp" ]

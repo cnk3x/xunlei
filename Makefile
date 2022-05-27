@@ -1,8 +1,10 @@
-push:
-	docker buildx build -t cnk3x/xunlei:latest -t cnk3x/xunlei:2.7.1 --platform=linux/amd64,linux/arm64 --push .
+VERSION:=2.8.0
 
 build:
-	docker buildx build -t cnk3x/xunlei:latest -t cnk3x/xunlei:2.7.1 --platform=linux/amd64 --load .
+	docker buildx build -t cnk3x/xunlei:latest --load .
+
+push:
+	docker buildx build -t cnk3x/xunlei:$(VERSION) -t cnk3x/xunlei:latest --platform=linux/amd64,linux/arm64 --push .
 
 up: 
 	docker compose up -d
@@ -12,8 +14,11 @@ down:
 
 clean: down
 	rm -rf data
+	rm -rf tmp
+	rm -rf local/xunlei
 
 log:
 	docker compose logs -f
 
-all: down build run log
+all: down build
+	docker compose up
