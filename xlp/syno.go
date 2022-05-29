@@ -147,9 +147,6 @@ func unbind(path string) (err error) {
 	if err = syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		return fmt.Errorf("[syno] 卸载目录 %q 失败: %w", path, err)
 	}
-	if err = os.RemoveAll(path); err != nil {
-		return fmt.Errorf("[syno] 删除目录 %q 失败: %w", path, err)
-	}
 	return
 }
 
@@ -240,13 +237,14 @@ func fileCopy(src, dst string, overwrite ...bool) (copied bool, err error) {
 		}
 		return
 	}
-	defer w.Close()
 
 	defer func() {
 		if err != nil {
 			_ = os.Remove(dst)
 		}
 	}()
+
+	defer w.Close()
 
 	if _, err = io.Copy(w, r); err != nil {
 		return
