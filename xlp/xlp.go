@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,52 +28,93 @@ const (
 
 type Options struct {
 	Home         string //数据目录
-	DownloadPATH string //下载目录
+	DownloadPATH string //下载保存目录
 	Port         int    //网页控制面板访问端口
 	Debug        bool   //调试模式，输出迅雷原始的log
 }
 
-func getOpts() Options {
-	var xlOpts Options
-	xlOpts.Home = getEnv("XL_HOME", "/data")
-	xlOpts.DownloadPATH = getEnv("XL_DOWNLOAD_PATH", "/downloads")
-	xlOpts.Debug, _ = strconv.ParseBool(getEnv("XL_DEBUG", "0"))
-	xlOpts.Port, _ = strconv.Atoi(getEnv("XL_WEB_PORT", "2345"))
-	return xlOpts
+func getOpt(opt ...*Options) (xlOpt *Options, err error) {
+	if len(opt) > 0 && opt[0] != nil {
+		xlOpt = opt[0]
+	} else {
+		xlOpt = &Options{
+			Home:         os.Getenv(ENV_HOME),
+			DownloadPATH: os.Getenv(ENV_DOWNLOAD_PATH),
+		}
+		xlOpt.Debug, _ = strconv.ParseBool(os.Getenv(ENV_DEBUG))
+		xlOpt.Port, _ = strconv.Atoi(os.Getenv(ENV_WEB_PORT))
+	}
+
+	if xlOpt.Home == "" {
+		xlOpt.Home = "/data"
+	} else if xlOpt.Home, err = filepath.Abs(xlOpt.Home); err != nil {
+		return
+	}
+
+	if xlOpt.DownloadPATH == "" {
+		xlOpt.DownloadPATH = "/downloads"
+	} else if xlOpt.DownloadPATH, err = filepath.Abs(xlOpt.DownloadPATH); err != nil {
+		return
+	}
+
+	if xlOpt.Port < 0 {
+		xlOpt.Port = 2345
+	}
+	return
 }
 
-func xlp(ctx context.Context, xlOpts Options) {
-	log.Printf("[xlp] 数据目录: %s", xlOpts.Home)
-	log.Printf("[xlp] 网页端口: %d", xlOpts.Port)
-	log.Printf("[xlp] 调试模式: %t", xlOpts.Debug)
-	log.Printf("[xlp] 下载目录: %s", xlOpts.DownloadPATH)
+func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
+	var xlOpt *Options
+	if xlOpt, err = getOpt(xlOpts...); err != nil {
+		return
+	}
 
-	var err error
-	xlOpts.Home, err = filepath.Abs(xlOpts.Home)
-	fatalErr(err, "[xlp] 数据目录路径错误:")
-	xlOpts.DownloadPATH, err = filepath.Abs(xlOpts.DownloadPATH)
-	fatalErr(err, "[xlp] 下载目录路径错误:")
+	log.Printf("[xlp] 数据目录: %s", xlOpt.Home)
+	log.Printf("[xlp] 网页端口: %d", xlOpt.Port)
+	log.Printf("[xlp] 调试模式: %t", xlOpt.Debug)
+	log.Printf("[xlp] 下载目录: %s", xlOpt.DownloadPATH)
 
-	var environs []string
+	environs := os.Environ()
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MAJOR="+SYNOPKG_DSM_VERSION_MAJOR)
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MINOR="+SYNOPKG_DSM_VERSION_MINOR)
 	environs = append(environs, "SYNOPKG_DSM_VERSION_BUILD="+SYNOPKG_DSM_VERSION_BUILD)
 	environs = append(environs, "SYNOPLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "SYNOPKG_PKGNAME="+SYNOPKG_PKGNAME)
 	environs = append(environs, "SYNOPKG_PKGDEST="+SYNOPKG_PKGDEST)
-	environs = append(environs, "HOME="+xlOpts.Home)
+	environs = append(environs, "HOME="+xlOpt.Home)
 	environs = append(environs, "DriveListen="+fmt.Sprintf("unix://%s/var/pan-xunlei-com.sock", TARGET_DIR))
 	environs = append(environs, "PLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "OS_VERSION="+fmt.Sprintf("%s dsm %s.%s-%s", SYNOPLATFORM, SYNOPKG_DSM_VERSION_MAJOR, SYNOPKG_DSM_VERSION_MINOR, SYNOPKG_DSM_VERSION_BUILD))
-	environs = append(environs, "DownloadPATH="+xlOpts.DownloadPATH)
+	environs = append(environs, "DownloadPATH="+xlOpt.DownloadPATH)
 
-	fatalErr(os.MkdirAll(xlOpts.Home, 0777), "[xlp] 创建数据目录:")
-	fatalErr(os.MkdirAll(xlOpts.DownloadPATH, 0777), "[xlp] 创建下载目录:")
-	fatalErr(os.MkdirAll(xlOpts.Home+"/logs", 0777), "[xlp] 创建日志目录:")
-	fatalErr(os.MkdirAll(TARGET_DIR+"/var", 0777), "[xlp] 创建变量目录:")
+	if err = os.MkdirAll(xlOpt.Home, os.ModePerm); err != nil {
+		err = fmt.Errorf("[xlp] 创建数据目录: %w", err)
+		return
+	}
 
-	fatalErr(fakeSynoInfo(xlOpts.Home))
-	fatalErr(os.Chdir(xlOpts.Home), "[xlp] 跳转到数据库:")
+	// if err = os.MkdirAll(BASE_DOWNLOAD_PATH, os.ModePerm); err != nil {
+	// 	err = fmt.Errorf("[xlp] 创建下载目录: %w", err)
+	// 	return
+	// }
+
+	if err = os.MkdirAll(xlOpt.Home+"/logs", os.ModePerm); err != nil {
+		err = fmt.Errorf("[xlp] 创建日志目录: %w", err)
+		return
+	}
+
+	if err = os.MkdirAll(TARGET_DIR+"/var", os.ModePerm); err != nil {
+		err = fmt.Errorf("[xlp] 创建变量目录: %w", err)
+		return
+	}
+
+	if err = fakeSynoInfo(xlOpt.Home); err != nil {
+		return
+	}
+
+	if err = os.Chdir(xlOpt.Home); err != nil {
+		err = fmt.Errorf("[xlp] 跳转到数据库: %w", err)
+		return
+	}
 
 	c := exec.CommandContext(ctx,
 		fmt.Sprintf("%s/bin/xunlei-pan-cli-launcher.%s", TARGET_DIR, runtime.GOARCH),
@@ -81,17 +124,28 @@ func xlp(ctx context.Context, xlOpts Options) {
 
 	c.Env = environs
 	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
-	if xlOpts.Debug {
+	if xlOpt.Debug {
 		c.Stderr = os.Stderr
 		c.Stdout = os.Stdout
 		c.Stdin = os.Stdin
 	}
 
-	fatalErr(c.Start(), "[xlp] [启动器] 启动失败:")
+	if err = c.Start(); err != nil {
+		err = fmt.Errorf("[xlp] [启动器] 启动失败: %w", err)
+		return
+	}
+
 	pid := c.Process.Pid
 	log.Printf("[xlp] [启动器] 启动成功: %d", pid)
-	go fakeWeb(ctx, environs, xlOpts.Port)
-	fatalErr(c.Wait(), "[xlp] [启动器] 已退出:")
+
+	go fakeWeb(ctx, environs, xlOpt.Port)
+
+	if err = c.Wait(); err != nil {
+		err = fmt.Errorf("[xlp] [启动器] 结束失败: %w", err)
+		return
+	}
+
+	return
 }
 
 func fakeWeb(ctx context.Context, environs []string, port int) {
@@ -162,4 +216,14 @@ func fakeSynoInfo(home string) (err error) {
 	}
 
 	return
+}
+
+func randText(size int) string {
+	var d = make([]byte, size)
+	n, _ := rand.Read(d)
+	s := hex.EncodeToString(d[:n])
+	if len(s) > size {
+		s = s[:size]
+	}
+	return s
 }
