@@ -28,7 +28,7 @@ FROM ubuntu:18.04 as vip
 LABEL maintainer=七月<wen@k3x.cn>
 
 COPY --from=builder /rootfs /
-COPY --from=builder /etc/localtime /etc/timezone /etc/timezone /etc/
+COPY --from=builder /etc/localtime /etc/timezone /etc/
 
 ENV XL_WEB_PORT=2345 XL_DEBUG=0
 EXPOSE 2345
