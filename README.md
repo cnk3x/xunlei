@@ -125,3 +125,12 @@ services:
     restart: always
 ```
  
+## 折腾了一个基于busybox的小镜像版本，可以尝试一下，x86_64没问题，arm64就不确定了，可能缺库。
+
+用法与上面相同，把镜像改成下面即可
+
+镜像:
+
+cnk3x/xunlei:busybox
+
+cnk3x/xunlei:busybox-syno
