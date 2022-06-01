@@ -33,7 +33,7 @@ docker run -d --name=xunlei --hostname=my-nas-1 --net=host \
 docker run -d --name=xunlei --hostname=my-nas-1 --net=host \
   -v=<数据目录>:/data -v=<下载目录>:/downloads \
   # -e=XL_WEB_PORT=2345 \
-  --restart=always --privilage cnk3x/xunlei:syno
+  --restart=always --privileged cnk3x/xunlei:syno
 ```
 
 ### docker compose
@@ -44,7 +44,7 @@ docker run -d --name=xunlei --hostname=my-nas-1 --net=host \
 services:
   xunlei:
     image: cnk3x/xunlei:syno
-    privilage: true
+    privileged: true
     container_name: xunlei
     hostname: my-nas-1
     network_mode: host
@@ -72,4 +72,13 @@ services:
       - <下载目录>:/downloads
     restart: always
 ```
- 
+
+## 折腾了一个基于busybox的小镜像版本，可以尝试一下，x86_64没问题，arm64就不确定了，可能缺库。
+
+用法与上面相同，把镜像改成下面即可
+
+镜像:
+
+cnk3x/xunlei:busybox
+
+cnk3x/xunlei:busybox-syno

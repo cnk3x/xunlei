@@ -38,13 +38,12 @@ func syno(ctx context.Context) (err error) {
 	}
 
 	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin"}
-	mustBinds := []string{"/dev", "/sys", "/var/packages/pan-xunlei-com/target", xlOpt.Home, xlOpt.DownloadPATH}
+	mustBinds := []string{"/dev", "/sys", TARGET_DIR, xlOpt.Home, xlOpt.DownloadPATH}
 
 	files := []string{
 		"/etc/resolv.conf",
 		"/etc/localtime",
 		"/etc/timezone",
-		"/etc/hosts",
 		"/etc/hosts",
 		"/etc/ssl/certs/ca-certificates.crt",
 	}
