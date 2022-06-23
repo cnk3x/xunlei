@@ -2,83 +2,110 @@
 
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。
 
-x86_64 版本已在万由的U-NAS系统的Docker测试通过，arm64 没有机器，暂时未测。
+维护多个版本供选择比较麻烦，从2.9.1开始，只提供模拟群晖的版本。镜像名称为 [cnk3x/xunlei:latest](https://hub.docker.com/r/cnk3x/xunlei)
 
-[源码: https://github.com/cnk3x/xunlei/tree/docker](https://github.com/cnk3x/xunlei/tree/docker)
+[源码仓库: https://github.com/cnk3x/xunlei/tree/docker](https://github.com/cnk3x/xunlei/tree/docker)
 
-[容器: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
+[容器镜像: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
 
 - 环境变量 `XL_WEB_PORT`: 网页访问端口，默认 `2345`。
 - 环境变量 `XL_HOME`: 数据目录（保存迅雷账号，设置等信息），默认 `/data`。
 - 环境变量 `XL_DOWNLOAD_PATH`: 下载保存根目录，默认 `/downloads`。
-- 环境变量 `XL_DOWNLOAD_PATH_SUBS`: 如果有多个下载目录，使用次此参数来设置 (在群晖迅雷模式有效)。
 - 环境变量 `XL_DEBUG`: 1 为调试模式，输出详细的日志信息，0: 关闭，不显示迅雷套件输出的日志，默认0.
-- `容器版迅雷模式`: 需要白金以上会员，不需要 `privilage` 权限，如果是白金会员，推荐此方式。 
-- `群晖版迅雷模式`: 非会员每日三次机会，需要 `privilage` 权限。 
-- `hostname`: 迅雷会以主机名来命名远程设备，你在迅雷App上看到的就是这个。 
-- `host` 网络下载速度比 `bridge` 快10倍, 如果没有条件使用host网络，映射`XL_WEB_PORT`设定的端口`tcp`即可 。 
+- `hostname`: 迅雷会以主机名来命名远程设备，你在迅雷App上看到的就是这个。
+- `host` 网络下载速度比 `bridge` 快, 如果没有条件使用host网络，映射`XL_WEB_PORT`设定的端口`tcp`即可。
+- 安装好绑定完后可以在线升级到迅雷官方最新版本
 
-### docker shell
-
-```bash
-# 容器版迅雷模式
-docker run -d --name=xunlei --hostname=my-nas-1 --net=host \
-  -v=<数据目录>:/data -v=<下载目录>:/downloads \
-  # -e=XL_WEB_PORT=2345 \
-  --restart=always cnk3x/xunlei:latest
-```
+## docker shell
 
 ```bash
-# 群晖版迅雷模式
-docker run -d --name=xunlei --hostname=my-nas-1 --net=host \
-  -v=<数据目录>:/data -v=<下载目录>:/downloads \
-  # -e=XL_WEB_PORT=2345 \
-  --restart=always --privileged cnk3x/xunlei:syno
+# 以下 
+# /mnt/sdb1/downloads 为实际的下载保存目录
+# /mnt/sdb1/docker/apps/xunlei/data 为实际的数据保存目录
+# 根据实际情况更改
+# 如果已经安装过的(/mnt/sdb1/docker/apps/xunlei/data 目录已存在)，再次安装会复用，而且下载目录不可更改，如果要更改下载目录，请把这个目录删掉重新绑定。
+
+# host网络，默认端口 2345
+docker run -d --name=xunlei --hostname=mynas --net=host -v /mnt/sdb1/docker/apps/xunlei/data:/data -v /mnt/sdb1/downloads:/downloads --restart=unless-stopped --privileged cnk3x/xunlei:latest
+
+# host网络，更改端口为 4321
+docker run -d --name=xunlei --hostname=mynas --net=host -e XL_WEB_PORT=4321 -v /mnt/sdb1/docker/apps/xunlei/data:/data -v /mnt/sdb1/downloads:/downloads --restart=unless-stopped --privileged cnk3x/xunlei:latest
+
+# bridge 网络，默认端口 2345
+docker run -d --name=xunlei --hostname=mynas --net=bridge -p 2345:2345 -v /mnt/sdb1/docker/apps/xunlei/data:/data -v /mnt/sdb1/downloads:/downloads --restart=unless-stopped --privileged cnk3x/xunlei:latest
+
+# bridge 网络，更改端口为 4321
+docker run -d --name=xunlei --hostname=mynas --net=bridge -p 4321:2345 -v /mnt/sdb1/docker/apps/xunlei/data:/data -v /mnt/sdb1/downloads:/downloads --restart=unless-stopped --privileged cnk3x/xunlei:latest
 ```
 
-### docker compose
+## docker compose
 
 ```yaml
+# host默认端口 2345
 # compose.yml
-# 群晖迅雷模式
+services:
+  xunlei:
+    image: cnk3x/xunlei:latest
+    privileged: true
+    container_name: xunlei
+    hostname: mynas
+    network_mode: host
+    volumes:
+      - /mnt/sdb1/docker/apps/xunlei/data:/data
+      - /mnt/sdb1/downloads:/downloads
+    restart: unless-stopped
+```
+
+```yaml
+# host更改端口 4321
+# compose.yml
+services:
+  xunlei:
+    image: cnk3x/xunlei:latest
+    privileged: true
+    container_name: xunlei
+    hostname: mynas
+    network_mode: host
+    environment:
+      - XL_WEB_PORT=4321
+    volumes:
+      - /mnt/sdb1/docker/apps/xunlei/data:/data
+      - /mnt/sdb1/downloads:/downloads
+    restart: unless-stopped
+```
+
+```yaml
+# bridge默认端口 2345
+# compose.yml
 services:
   xunlei:
     image: cnk3x/xunlei:syno
     privileged: true
     container_name: xunlei
-    hostname: my-nas-1
-    network_mode: host
-    #environment:
-    #  XL_WEB_PORT=2345
+    hostname: mynas
+    network_mode: bridge
+    ports:
+      - 2345:2345
     volumes:
-      - <数据目录>:/data
-      - <下载目录>:/downloads
-    restart: always
+      - /mnt/d/docker/apps/xunlei/data:/data
+      - /mnt/d/downloads:/downloads
+    restart: unless-stopped
 ```
 
 ```yaml
+# bridge更改端口 4321
 # compose.yml
-# Docker迅雷模式
 services:
   xunlei:
-    image: cnk3x/xunlei:latest
+    image: cnk3x/xunlei:syno
+    privileged: true
     container_name: xunlei
-    hostname: my-nas-1
-    network_mode: host
-    #environment:
-    #  XL_WEB_PORT=2345
+    hostname: mynas
+    network_mode: bridge
+    ports:
+      - 4321:2345
     volumes:
-      - <数据目录>:/data
-      - <下载目录>:/downloads
-    restart: always
+      - /mnt/d/docker/apps/xunlei/data:/data
+      - /mnt/d/downloads:/downloads
+    restart: unless-stopped
 ```
-
-## 折腾了一个基于busybox的小镜像版本，可以尝试一下，x86_64没问题，arm64就不确定了，可能缺库。
-
-用法与上面相同，把镜像改成下面即可
-
-镜像:
-
-cnk3x/xunlei:busybox
-
-cnk3x/xunlei:busybox-syno

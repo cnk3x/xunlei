@@ -1,4 +1,4 @@
-FROM golang:1.18.2 as builder
+FROM golang:1.18 as builder
 
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
@@ -16,25 +16,21 @@ RUN if [ "$(uname -m)" = "aarch64" ]; then arch=armv8; else arch=$(uname -m); fi
 
 WORKDIR /go/xlp
 COPY xlp .
-RUN GO111MODULE=on GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 go build -v -ldflags '-s -w -extldflags "-static"' ./
+RUN GO111MODULE=on GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 go build -v -ldflags '-s -w -extldflags "-static"' -o /rootfs/xunlei/xlp ./
 
-RUN mkdir -p /rootfs/xunlei && \
-    cp --parents /etc/ssl/certs/ca-certificates.crt /rootfs && \
-    cp -r --parents /var/packages/pan-xunlei-com/target /rootfs && \
-    cp /go/xlp/xlp /rootfs/xunlei/xlp
+RUN cp --parents /etc/ssl/certs/ca-certificates.crt /rootfs && \
+    cp --parents -r /var/packages/pan-xunlei-com/target /rootfs && \
+    cp --parents /etc/localtime /rootfs && \
+    cp --parents /etc/timezone /rootfs
 
 FROM ubuntu:18.04 as vip
 
-LABEL maintainer=七月<wen@k3x.cn>
+LABEL maintainer="七月<wen@k3x.cn>"
 
 COPY --from=builder /rootfs /
-COPY --from=builder /etc/localtime /etc/timezone /etc/
 
 ENV XL_WEB_PORT=2345 XL_DEBUG=0
-EXPOSE 2345
-VOLUME [ "/data", "/downloads" ]
-ENTRYPOINT [ "/xunlei/xlp" ]
-CMD ["run"]
 
-FROM vip as syno
+ENTRYPOINT [ "/xunlei/xlp" ]
+
 CMD ["syno"]

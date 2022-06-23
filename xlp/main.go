@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	ENV_HOME               = "XL_HOME"
-	ENV_WEB_PORT           = "XL_WEB_PORT"
-	ENV_DOWNLOAD_PATH      = "XL_DOWNLOAD_PATH"
-	ENV_DEBUG              = "XL_DEBUG"
-	ENV_DOWNLOAD_PATH_SUBS = "XL_DOWNLOAD_PATH_SUBS"
+	ENV_HOME          = "XL_HOME"
+	ENV_WEB_PORT      = "XL_WEB_PORT"
+	ENV_DOWNLOAD_PATH = "XL_DOWNLOAD_PATH"
+	ENV_DEBUG         = "XL_DEBUG"
 )
 
 func init() {

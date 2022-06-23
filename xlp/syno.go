@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"sort"
 	"syscall"
 )
 
@@ -37,14 +36,14 @@ func syno(ctx context.Context) (err error) {
 		return
 	}
 
-	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin"}
+	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin", "/mnt"}
 	mustBinds := []string{"/dev", "/sys", TARGET_DIR, xlOpt.Home, xlOpt.DownloadPATH}
 
 	files := []string{
 		"/etc/resolv.conf",
+		"/etc/hosts",
 		"/etc/localtime",
 		"/etc/timezone",
-		"/etc/hosts",
 		"/etc/ssl/certs/ca-certificates.crt",
 	}
 
@@ -65,22 +64,6 @@ func syno(ctx context.Context) (err error) {
 	log.Printf("[syno] 绑定可选目录")
 	if optionalBinded, _ := mounts(rootfs, optionalBinds); len(optionalBinded) > 0 {
 		defer umounts(optionalBinded...)
-	}
-
-	log.Printf("[syno] 绑定下载保存子目录")
-	var downloadSubPaths []string
-	if err = getDownloadPaths(os.Getenv(ENV_DOWNLOAD_PATH_SUBS), &downloadSubPaths); err != nil {
-		return
-	}
-
-	for _, path := range downloadSubPaths {
-		dst := filepath.Join(rootfs, xlOpt.DownloadPATH, path)
-		if err = bind(path, dst); err != nil {
-			err = fmt.Errorf("[syno] 绑定目录 %q -> %q: %w", path, dst, err)
-			return
-		}
-		defer mustUnbind(dst)
-		log.Printf("[syno] 绑定目录 %q -> %q: 成功", path, dst)
 	}
 
 	log.Printf("[syno] 运行环境处理完成")
@@ -126,6 +109,10 @@ func daemon(ctx context.Context) error {
 		log.Printf("[daemon] 切换数据目录: %s", rootfs)
 	}
 
+	if err := syscall.Symlink(xlOpt.DownloadPATH, "/迅雷下载"); err != nil {
+		return fmt.Errorf("[daemon] 设置下载目录失败: %w", err)
+	}
+
 	return xlp(ctx, xlOpt)
 }
 
@@ -136,7 +123,7 @@ func bind(src, dst string) (err error) {
 	if err = os.MkdirAll(dst, os.ModePerm); err != nil {
 		return fmt.Errorf("[syno] 创建目录 %q 失败: %w", dst, err)
 	}
-	if err = syscall.Mount(src, dst, "auto", syscall.MS_BIND, ""); err != nil {
+	if err = syscall.Mount(src, dst, "auto", syscall.MS_BIND|syscall.MS_SLAVE|syscall.MS_REC, ""); err != nil {
 		return fmt.Errorf("[syno] 绑定目录 %q -> %q 失败: %w", src, dst, err)
 	}
 	return
@@ -259,35 +246,6 @@ func fileCopy(src, dst string, overwrite ...bool) (copied bool, err error) {
 	}
 
 	copied = true
-	return
-}
-
-func getDownloadPaths(paths string, out *[]string) (err error) {
-	downloadPaths := filepath.SplitList(paths)
-	var stat os.FileInfo
-	for _, path := range downloadPaths {
-		if path == "" {
-			continue
-		}
-		if path == "/" {
-			err = fmt.Errorf("[syno] 下载目录设置有误: 不能为根目录")
-			return
-		}
-		if path, err = filepath.Abs(path); err != nil {
-			err = fmt.Errorf("[syno] 下载目录设置有误 %q: %w", path, err)
-			return
-		}
-		if stat, err = os.Stat(path); err != nil {
-			err = fmt.Errorf("[syno] 下载目录设置有误 %s: %w", path, err)
-			return
-		}
-		if !stat.IsDir() {
-			err = fmt.Errorf("[syno] 下载目录设置有误: %q 不是一个目录", path)
-			return
-		}
-		*out = append(*out, path)
-	}
-	sort.Strings(downloadPaths)
 	return
 }
 

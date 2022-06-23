@@ -74,14 +74,6 @@ func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
 	log.Printf("[xlp] 调试模式: %t", xlOpt.Debug)
 	log.Printf("[xlp] 下载目录: %s", xlOpt.DownloadPATH)
 
-	if stat, _ := os.Stat("xunlei.spk"); stat != nil {
-		log.Printf("[xlp] 解压spk文件")
-		if err = ExtractXunleiSpk("xunlei.spk", TARGET_DIR); err != nil {
-			err = fmt.Errorf("[xlp] 解压迅雷文件: %w", err)
-			return
-		}
-	}
-
 	environs := os.Environ()
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MAJOR="+SYNOPKG_DSM_VERSION_MAJOR)
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MINOR="+SYNOPKG_DSM_VERSION_MINOR)
@@ -93,7 +85,8 @@ func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
 	environs = append(environs, "DriveListen="+fmt.Sprintf("unix://%s/var/pan-xunlei-com.sock", TARGET_DIR))
 	environs = append(environs, "PLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "OS_VERSION="+fmt.Sprintf("%s dsm %s.%s-%s", SYNOPLATFORM, SYNOPKG_DSM_VERSION_MAJOR, SYNOPKG_DSM_VERSION_MINOR, SYNOPKG_DSM_VERSION_BUILD))
-	environs = append(environs, "DownloadPATH="+xlOpt.DownloadPATH)
+	environs = append(environs, "DownloadPATH=/迅雷下载")
+	// environs = append(environs, "DownloadPATH="+xlOpt.DownloadPATH)
 
 	if err = os.MkdirAll(xlOpt.Home, os.ModePerm); err != nil {
 		err = fmt.Errorf("[xlp] 创建数据目录: %w", err)
