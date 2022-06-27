@@ -109,9 +109,7 @@ func daemon(ctx context.Context) error {
 		log.Printf("[daemon] 切换数据目录: %s", rootfs)
 	}
 
-	if err := syscall.Symlink(xlOpt.DownloadPATH, "/迅雷下载"); err != nil {
-		return fmt.Errorf("[daemon] 设置下载目录失败: %w", err)
-	}
+	_ = syscall.Symlink(xlOpt.DownloadPATH, "/迅雷下载")
 
 	return xlp(ctx, xlOpt)
 }
