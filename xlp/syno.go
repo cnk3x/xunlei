@@ -119,7 +119,7 @@ func mounts(rootfs string, binds []string, rollbackOnError ...bool) (binded []st
 			if errRollback {
 				break
 			} else {
-				log.Println(err)
+				log.Printf("[忽略] %v", err)
 				err = nil
 			}
 		}
