@@ -119,8 +119,8 @@ func mounts(rootfs string, binds []string, rollbackOnError ...bool) (binded []st
 			if errRollback {
 				break
 			} else {
-				err = nil
 				log.Println(err)
+				err = nil
 			}
 		}
 		binded = append(binded, dst)
