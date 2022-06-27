@@ -7,6 +7,4 @@ build:
 	docker buildx build -t cnk3x/xunlei:latest --load .
 
 push:
-	docker buildx build -t cnk3x/xunlei:$(VERSION) -t cnk3x/xunlei:latest --platform linux/amd64 --push .
-	docker buildx build -t cnk3x/xunlei:arm64-$(VERSION) -t cnk3x/xunlei:arm64 --platform linux/arm64 --push .
 	docker buildx build -t cnk3x/xunlei:$(VERSION) -t cnk3x/xunlei:latest --platform linux/amd64,linux/arm64 --push .

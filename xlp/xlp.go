@@ -26,54 +26,7 @@ const (
 	TARGET_DIR                = SYNOPKG_PKGDEST + "/target"
 )
 
-type Options struct {
-	Home         string //数据目录
-	DownloadPATH string //下载保存目录
-	Port         int    //网页控制面板访问端口
-	Debug        bool   //调试模式，输出迅雷原始的log
-}
-
-func getOpt(opt ...*Options) (xlOpt *Options, err error) {
-	if len(opt) > 0 && opt[0] != nil {
-		xlOpt = opt[0]
-	} else {
-		xlOpt = &Options{
-			Home:         os.Getenv(ENV_HOME),
-			DownloadPATH: os.Getenv(ENV_DOWNLOAD_PATH),
-		}
-		xlOpt.Debug, _ = strconv.ParseBool(os.Getenv(ENV_DEBUG))
-		xlOpt.Port, _ = strconv.Atoi(os.Getenv(ENV_WEB_PORT))
-	}
-
-	if xlOpt.Home == "" {
-		xlOpt.Home = "/data"
-	} else if xlOpt.Home, err = filepath.Abs(xlOpt.Home); err != nil {
-		return
-	}
-
-	if xlOpt.DownloadPATH == "" {
-		xlOpt.DownloadPATH = "/downloads"
-	} else if xlOpt.DownloadPATH, err = filepath.Abs(xlOpt.DownloadPATH); err != nil {
-		return
-	}
-
-	if xlOpt.Port < 0 {
-		xlOpt.Port = 2345
-	}
-	return
-}
-
-func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
-	var xlOpt *Options
-	if xlOpt, err = getOpt(xlOpts...); err != nil {
-		return
-	}
-
-	log.Printf("[xlp] 数据目录: %s", xlOpt.Home)
-	log.Printf("[xlp] 网页端口: %d", xlOpt.Port)
-	log.Printf("[xlp] 调试模式: %t", xlOpt.Debug)
-	log.Printf("[xlp] 下载目录: %s", xlOpt.DownloadPATH)
-
+func xlp(ctx context.Context) (err error) {
 	environs := os.Environ()
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MAJOR="+SYNOPKG_DSM_VERSION_MAJOR)
 	environs = append(environs, "SYNOPKG_DSM_VERSION_MINOR="+SYNOPKG_DSM_VERSION_MINOR)
@@ -81,33 +34,27 @@ func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
 	environs = append(environs, "SYNOPLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "SYNOPKG_PKGNAME="+SYNOPKG_PKGNAME)
 	environs = append(environs, "SYNOPKG_PKGDEST="+SYNOPKG_PKGDEST)
-	environs = append(environs, "HOME="+xlOpt.Home)
+	environs = append(environs, "HOME="+dataDir)
 	environs = append(environs, "DriveListen="+fmt.Sprintf("unix://%s/var/pan-xunlei-com.sock", TARGET_DIR))
 	environs = append(environs, "PLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "OS_VERSION="+fmt.Sprintf("%s dsm %s.%s-%s", SYNOPLATFORM, SYNOPKG_DSM_VERSION_MAJOR, SYNOPKG_DSM_VERSION_MINOR, SYNOPKG_DSM_VERSION_BUILD))
-	environs = append(environs, "DownloadPATH=/迅雷下载")
-	// environs = append(environs, "DownloadPATH="+xlOpt.DownloadPATH)
+	environs = append(environs, "DownloadPATH="+downloadDir)
 
-	if err = os.MkdirAll(xlOpt.Home, os.ModePerm); err != nil {
-		err = fmt.Errorf("[xlp] 创建数据目录: %w", err)
-		return
-	}
-
-	if err = os.MkdirAll(xlOpt.Home+"/logs", os.ModePerm); err != nil {
+	if err = os.MkdirAll(filepath.Join(dataDir, "logs"), os.ModePerm); err != nil {
 		err = fmt.Errorf("[xlp] 创建日志目录: %w", err)
 		return
 	}
 
-	if err = os.MkdirAll(TARGET_DIR+"/var", os.ModePerm); err != nil {
+	if err = os.MkdirAll(filepath.Join(TARGET_DIR, "/var"), os.ModePerm); err != nil {
 		err = fmt.Errorf("[xlp] 创建变量目录: %w", err)
 		return
 	}
 
-	if err = fakeSynoInfo(xlOpt.Home); err != nil {
+	if err = fakeSynoInfo(dataDir); err != nil {
 		return
 	}
 
-	if err = os.Chdir(xlOpt.Home); err != nil {
+	if err = Chdir(dataDir); err != nil {
 		err = fmt.Errorf("[xlp] 跳转到数据库: %w", err)
 		return
 	}
@@ -119,8 +66,8 @@ func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
 	)
 
 	c.Env = environs
-	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
-	if xlOpt.Debug {
+	c.SysProcAttr = SetSysProc(&syscall.SysProcAttr{})
+	if debug, _ := strconv.ParseBool(os.Getenv(ENV_DEBUG)); debug {
 		c.Stderr = os.Stderr
 		c.Stdout = os.Stdout
 		c.Stdin = os.Stdin
@@ -134,7 +81,11 @@ func xlp(ctx context.Context, xlOpts ...*Options) (err error) {
 	pid := c.Process.Pid
 	log.Printf("[xlp] [启动器] 启动成功: %d", pid)
 
-	go fakeWeb(ctx, environs, xlOpt.Port)
+	optPort, _ := strconv.Atoi(os.Getenv(ENV_WEB_PORT))
+	if optPort < 0 {
+		optPort = 2345
+	}
+	go fakeWeb(ctx, environs, optPort)
 
 	if err = c.Wait(); err != nil {
 		err = fmt.Errorf("[xlp] [启动器] 结束失败: %w", err)
@@ -199,7 +150,6 @@ func fakeSynoInfo(home string) (err error) {
 	if err = os.WriteFile(dst, data, 0666); err != nil {
 		return fmt.Errorf("[xlp] [复制] %s -> %s: 写入出错: %w", src, dst, err)
 	}
-	log.Printf("[xlp] [复制] %s -> %s: 成功", src, dst)
 
 	const synoAuthenticate = "/usr/syno/synoman/webman/modules/authenticate.cgi"
 	if _, err = os.Stat(synoAuthenticate); os.IsNotExist(err) {

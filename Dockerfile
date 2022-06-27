@@ -11,7 +11,9 @@ RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo "Asia/Shanghai" 
 COPY spk /spk
 WORKDIR /var/packages/pan-xunlei-com/target
 RUN if [ "$(uname -m)" = "aarch64" ]; then arch=armv8; else arch=$(uname -m); fi; \
-    tar --wildcards -Oxf $(find /spk -type f -name \*-${arch}.spk | head -n1) package.tgz | tar --wildcards -xJ 'bin/bin/*' 'ui/index.cgi'; \
+    spkFn=$(find /spk -type f -name \*-${arch}.spk | head -n1); \
+    if [ ! -f "${spkFn}" ]; then exit 1; fi; \
+    tar --wildcards -Oxf ${spkFn} package.tgz | tar --wildcards -xJ 'bin/bin/*' 'ui/index.cgi'; \
     mv bin/bin/* bin; rm -rf bin/bin
 
 WORKDIR /go/xlp
@@ -30,6 +32,8 @@ LABEL maintainer="七月<wen@k3x.cn>"
 COPY --from=builder /rootfs /
 
 ENV XL_WEB_PORT=2345 XL_DEBUG=0
+
+VOLUME [ "/xunlei/downloads", "/xunlei/data" ]
 
 ENTRYPOINT [ "/xunlei/xlp" ]
 

@@ -10,10 +10,12 @@ import (
 )
 
 const (
-	ENV_HOME          = "XL_HOME"
-	ENV_WEB_PORT      = "XL_WEB_PORT"
-	ENV_DOWNLOAD_PATH = "XL_DOWNLOAD_PATH"
-	ENV_DEBUG         = "XL_DEBUG"
+	ENV_WEB_PORT = "XL_WEB_PORT"
+	ENV_DEBUG    = "XL_DEBUG"
+
+	rootfs      = "/xunlei"
+	downloadDir = "/downloads"
+	dataDir     = "/data"
 )
 
 func init() {
