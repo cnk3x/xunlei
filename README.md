@@ -108,3 +108,9 @@ services:
       - /mnt/sdb1/downloads:/xunlei/downloads
     restart: unless-stopped
 ```
+
+# systemd 服务版本
+
+## Docker
+
+https://github.com/cnk3x/xunlei/tree/main
