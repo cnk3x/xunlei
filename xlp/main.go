@@ -46,6 +46,6 @@ func main() {
 		os.Exit(1)
 	}
 	if err != nil {
-		log.Fatalf("错误: %v", err)
+		log.Fatalf("%v", err)
 	}
 }

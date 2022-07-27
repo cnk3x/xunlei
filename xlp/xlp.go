@@ -67,14 +67,14 @@ func xlp(ctx context.Context) (err error) {
 
 	c.Env = environs
 	c.SysProcAttr = SetSysProc(&syscall.SysProcAttr{})
-	if debug, _ := strconv.ParseBool(os.Getenv(ENV_DEBUG)); debug {
+	if isDebug() {
 		c.Stderr = os.Stderr
 		c.Stdout = os.Stdout
 		c.Stdin = os.Stdin
 	}
 
 	if err = c.Start(); err != nil {
-		err = fmt.Errorf("[xlp] [启动器] 启动失败: %w", err)
+		err = fmt.Errorf("[xlp] [启动器] 启动: %w", err)
 		return
 	}
 
@@ -88,7 +88,7 @@ func xlp(ctx context.Context) (err error) {
 	go fakeWeb(ctx, environs, optPort)
 
 	if err = c.Wait(); err != nil {
-		err = fmt.Errorf("[xlp] [启动器] 结束失败: %w", err)
+		err = fmt.Errorf("[xlp] [启动器] 结束: %w", err)
 		return
 	}
 
@@ -113,13 +113,23 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 	mux.Handle("/webman/login.cgi", login)
 	mux.Handle("/", redirect(home+"/", 307))
 	mux.Handle(home, redirect(home+"/", 307))
-	mux.Handle(home+"/", &cgi.Handler{Path: fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR), Env: environs})
+
+	indexCGI := &cgi.Handler{Path: fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR), Env: environs}
+	if isDebug() {
+		devNull, _ := os.OpenFile(os.DevNull, os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
+		defer devNull.Close()
+		indexCGI.Stderr = devNull
+		indexCGI.Logger = log.New(devNull, "", 0)
+	}
+
+	mux.Handle(home+"/", indexCGI)
 
 	s := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
 	go func() {
 		<-ctx.Done()
 		_ = s.Shutdown(context.Background())
 	}()
+
 	log.Printf("[xlp] [UI]启动: %v", s.Addr)
 	if err := s.ListenAndServe(); err != nil {
 		if err != http.ErrServerClosed {
@@ -162,6 +172,11 @@ func fakeSynoInfo(home string) (err error) {
 	}
 
 	return
+}
+
+func isDebug() bool {
+	debug, _ := strconv.ParseBool(os.Getenv(ENV_DEBUG))
+	return debug
 }
 
 func randText(size int) string {

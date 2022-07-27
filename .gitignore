@@ -1,3 +1,5 @@
 tmp/
 local/
 .vscode/
+/data
+/downloads
