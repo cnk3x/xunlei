@@ -13,9 +13,9 @@ import (
 )
 
 func syno(ctx context.Context) (err error) {
-	if !isRunInDocker() {
-		return fmt.Errorf("[syno] 只能在 docker 中运行")
-	}
+	// if !isRunInDocker() {
+	// 	return fmt.Errorf("[syno] 只能在 docker 中运行")
+	// }
 
 	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin", "/mnt"}
 	mustBinds := []string{"/dev", "/sys", TARGET_DIR}
@@ -211,9 +211,9 @@ func fileCopy(src, dst string, overwrite ...bool) (copied bool, err error) {
 	return
 }
 
-func isRunInDocker() bool {
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return true
-	}
-	return false
-}
+// func isRunInDocker() bool {
+// 	if _, err := os.Stat("/.dockerenv"); err == nil {
+// 		return true
+// 	}
+// 	return false
+// }

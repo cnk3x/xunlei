@@ -1,1 +1,2 @@
-docker buildx build -t cnk3x/xunlei:2.10.0 -t cnk3x/xunlei:latest --platform "linux/amd64,linux/arm64" --push .
+docker buildx --builder crossbud build -t ghcr.io/cnk3x/xunlei:3.0.2 -t ghcr.io/cnk3x/xunlei:latest --platform "linux/amd64,linux/arm64" --push .
+# docker buildx --builder crossbud build -t cnk3x/xunlei:3.0.2 -t cnk3x/xunlei:latest --platform "linux/amd64,linux/arm64" --push .

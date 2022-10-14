@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/cgi"
@@ -115,11 +116,12 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 	mux.Handle(home, redirect(home+"/", 307))
 
 	indexCGI := &cgi.Handler{Path: fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR), Env: environs}
-	if isDebug() {
-		devNull, _ := os.OpenFile(os.DevNull, os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModePerm)
-		defer devNull.Close()
-		indexCGI.Stderr = devNull
-		indexCGI.Logger = log.New(devNull, "", 0)
+	if !isDebug() {
+		indexCGI.Stderr = io.Discard
+		indexCGI.Logger = log.New(io.Discard, "", 0)
+	} else {
+		indexCGI.Stderr = os.Stderr
+		indexCGI.Logger = log.Default()
 	}
 
 	mux.Handle(home+"/", indexCGI)
