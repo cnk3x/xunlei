@@ -27,3 +27,7 @@ func SetSysProc(attr *syscall.SysProcAttr) *syscall.SysProcAttr {
 	attr.HideWindow = true
 	return attr
 }
+
+func SetUser(attr *syscall.SysProcAttr) (uid, gid int) {
+	return
+}

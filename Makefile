@@ -1,10 +1,14 @@
 VERSION := 3.0.2
+HOMEREPO := $(cat code.home.casaos.cn/w7x)
 
 version:
 	@echo $(VERSION)
 
 localhost:
-	docker buildx build -t localhost/w7x/xunlei:$(VERSION) --load .
+	docker buildx build -t localhost/xunlei:$(VERSION) --load .
+
+home:
+	docker buildx build -t $(HOMEREPO)/xunlei:$(VERSION) --push .
 
 push:
 	docker buildx build -t cnk3x/xunlei:$(VERSION) -t cnk3x/xunlei:latest --platform linux/amd64,linux/arm64 --push .

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/cgi"
@@ -39,7 +40,7 @@ func xlp(ctx context.Context) (err error) {
 	environs = append(environs, "DriveListen="+fmt.Sprintf("unix://%s/var/pan-xunlei-com.sock", TARGET_DIR))
 	environs = append(environs, "PLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "OS_VERSION="+fmt.Sprintf("%s dsm %s.%s-%s", SYNOPLATFORM, SYNOPKG_DSM_VERSION_MAJOR, SYNOPKG_DSM_VERSION_MINOR, SYNOPKG_DSM_VERSION_BUILD))
-	environs = append(environs, "DownloadPATH="+downloadDir)
+	environs = append(environs, "DownloadPATH=/迅雷下载")
 
 	if err = os.MkdirAll(filepath.Join(dataDir, "logs"), os.ModePerm); err != nil {
 		err = fmt.Errorf("[xlp] 创建日志目录: %w", err)
@@ -68,6 +69,12 @@ func xlp(ctx context.Context) (err error) {
 
 	c.Env = environs
 	c.SysProcAttr = SetSysProc(&syscall.SysProcAttr{})
+	uid, gid := SetUser(c.SysProcAttr)
+	if uid > 0 {
+		rChown(SYNOPKG_PKGDEST, uid, gid)
+		rChown(dataDir, uid, gid)
+	}
+
 	if isDebug() {
 		c.Stderr = os.Stderr
 		c.Stdout = os.Stdout
@@ -189,4 +196,16 @@ func randText(size int) string {
 		s = s[:size]
 	}
 	return s
+}
+
+func rChown(rootPath string, uid, gid int) {
+	if uid == 0 {
+		return
+	}
+	_ = filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+		if err := os.Chown(path, uid, gid); err != nil {
+			fmt.Fprintf(os.Stderr, "chown: %v", err)
+		}
+		return nil
+	})
 }

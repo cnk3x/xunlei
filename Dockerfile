@@ -17,7 +17,7 @@ RUN if [ "$(uname -m)" = "aarch64" ]; then arch=armv8; else arch=$(uname -m); fi
     tar --wildcards -Oxf ${spkFn} package.tgz | tar --wildcards -xJ 'bin/bin/*' 'ui/index.cgi'; \
     mv bin/bin/* bin; rm -rf bin/bin
 
-WORKDIR /go/xlp
+WORKDIR /goxlp
 COPY xlp .
 RUN GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 \
     go build -v -ldflags '-s -w -extldflags "-static"' -tags netgo -o /rootfs/xunlei/xlp ./

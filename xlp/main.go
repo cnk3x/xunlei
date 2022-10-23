@@ -13,9 +13,9 @@ const (
 	ENV_WEB_PORT = "XL_WEB_PORT"
 	ENV_DEBUG    = "XL_DEBUG"
 
-	rootfs      = "/xunlei"
-	downloadDir = "/downloads"
-	dataDir     = "/data"
+	rootfs  = "/xunlei"
+	dataDir = "/data"
+	// downloadDir = "/downloads"
 )
 
 func init() {

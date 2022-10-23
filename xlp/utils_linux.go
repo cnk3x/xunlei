@@ -2,7 +2,12 @@
 
 package main
 
-import "syscall"
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"syscall"
+)
 
 func Chroot(path string) error {
 	return syscall.Chroot(path)
@@ -23,4 +28,14 @@ func Unmount(path string) error {
 func SetSysProc(attr *syscall.SysProcAttr) *syscall.SysProcAttr {
 	attr.Pdeathsig = syscall.SIGKILL
 	return attr
+}
+
+func SetUser(attr *syscall.SysProcAttr) (uid, gid int) {
+	euid := os.Getenv("UID")
+	egid := os.Getenv("GID")
+	uid, _ = strconv.Atoi(euid)
+	gid, _ = strconv.Atoi(egid)
+	fmt.Printf("uid=%d,gid=%d\n", uid, gid)
+	attr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
+	return
 }

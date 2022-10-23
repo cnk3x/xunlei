@@ -42,6 +42,10 @@ func syno(ctx context.Context) (err error) {
 		defer umounts(optionalBinded...)
 	}
 
+	if err := bind("/xunlei/downloads", "/xunlei/迅雷下载"); err == nil {
+		defer mustUnbind("/xunlei/迅雷下载")
+	}
+
 	p, err := os.Executable()
 	if err != nil {
 		return err
@@ -89,6 +93,7 @@ func bind(src, dst string) (err error) {
 	if err = os.MkdirAll(dst, os.ModePerm); err != nil {
 		return fmt.Errorf("[syno] 创建目录 %q 失败: %w", dst, err)
 	}
+
 	if err = Mount(src, dst); err != nil {
 		return fmt.Errorf("[syno] 绑定目录 %q -> %q 失败: %w", src, dst, err)
 	}
