@@ -10,6 +10,8 @@ v2.10.0 起: 固定下载目录为 `/xunlei/downloads`, 数据目录为 `/xunlei
 
 [容器镜像: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
 
+新增阿里云镜像（国内访问） registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
+
 - 环境变量 `XL_WEB_PORT`: 网页访问端口，默认 `2345`。
 - 环境变量 `XL_DEBUG`: 1 为调试模式，输出详细的日志信息，0: 关闭，不显示迅雷套件输出的日志，默认0.
 - 环境变量 `UID`, `GID`, 设定运行迅雷下载的用户，使用此参数注意下载目录必须是该账户有可写权限。
