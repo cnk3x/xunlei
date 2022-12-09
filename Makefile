@@ -1,4 +1,4 @@
-VERSION := 3.0.2
+VERSION := 3.1.8
 HOMEREPO := $(cat code.home.casaos.cn/w7x)
 
 version:

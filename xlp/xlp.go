@@ -38,7 +38,6 @@ func xlp(ctx context.Context) (err error) {
 	environs = append(environs, "SYNOPKG_PKGDEST="+SYNOPKG_PKGDEST)
 	environs = append(environs, "HOME="+dataDir)
 	environs = append(environs, "DriveListen="+fmt.Sprintf("unix://%s/var/pan-xunlei-com.sock", TARGET_DIR))
-	environs = append(environs, "PLATFORM="+SYNOPLATFORM)
 	environs = append(environs, "OS_VERSION="+fmt.Sprintf("%s dsm %s.%s-%s", SYNOPLATFORM, SYNOPKG_DSM_VERSION_MAJOR, SYNOPKG_DSM_VERSION_MINOR, SYNOPKG_DSM_VERSION_BUILD))
 	environs = append(environs, "DownloadPATH=/迅雷下载")
 
