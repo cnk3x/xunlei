@@ -1,5 +1,5 @@
 VERSION := 3.1.8
-HOMEREPO := $(cat code.home.casaos.cn/w7x)
+HOMEREPO := $(shell cat home.repo.txt)
 
 version:
 	@echo $(VERSION)
@@ -15,3 +15,6 @@ push:
 
 ghcr:
 	docker buildx build -t ghcr.io/cnk3x/xunlei:$(VERSION) -t ghcr.io/cnk3x/xunlei:latest --platform linux/amd64,linux/arm64 --push .
+
+aliyun:
+	docker buildx build -t registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:$(VERSION) -t registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest --platform linux/amd64,linux/arm64 --push .
