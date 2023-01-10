@@ -130,7 +130,7 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 		indexCGI.Logger = log.Default()
 	}
 
-	mux.Handle(home+"/", indexCGI)
+	mux.Handle(home+"/", basicAuth(indexCGI))
 
 	s := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
 	go func() {
@@ -207,4 +207,19 @@ func rChown(rootPath string, uid, gid int) {
 		}
 		return nil
 	})
+}
+
+func basicAuth(next http.Handler) http.Handler {
+	if u, p := os.Getenv("XL_BA_USER"), os.Getenv("XL_BA_PASSWORD"); u != "" && p != "" {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, pass, ok := r.BasicAuth()
+			if !ok || user != u || pass != p {
+				w.Header().Add("WWW-Authenticate", `Basic realm="xlp"`)
+				w.WriteHeader(401)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		})
+	}
+	return next
 }

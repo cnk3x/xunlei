@@ -22,13 +22,24 @@ COPY xlp .
 RUN GOPROXY=https://goproxy.cn,direct CGO_ENABLED=0 \
     go build -v -ldflags '-s -w -extldflags "-static"' -tags netgo -o /rootfs/xunlei/xlp ./
 
-RUN cp --parents /etc/ssl/certs/ca-certificates.crt /rootfs && \
-    cp --parents -r /var/packages/pan-xunlei-com/target /rootfs && \
-    cp --parents /etc/localtime /rootfs && \
-    cp --parents /etc/timezone /rootfs
+RUN cp --parents -r /var/packages/pan-xunlei-com/target /rootfs
 
 FROM ubuntu:focal
 LABEL maintainer="七月<wen@k3x.cn>"
+
+ENV LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive LANG=zh_CN.UTF-8 LANGUAGE=zh_CN.UTF-8 LC_ALL=C
+
+RUN sed -i 's/deb.debian.org/mirrors.bfsu.edu.cn/g' /etc/apt/sources.list \ 
+    && apt-get update && apt-get -y --no-install-recommends install tzdata locales xfonts-wqy wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# 设置中文环境
+RUN localedef -i zh_CN -c -f UTF-8 -A /usr/share/locale/locale.alias zh_CN.UTF-8 && locale-gen zh_CN.UTF-8 && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    dpkg-reconfigure -f noninteractive tzdata && \
+    rm -f /etc/localtime && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    find /var/lib/apt/lists -type f -delete && \
+    find /var/cache -type f -delete
+
 COPY --from=builder /rootfs /
 ENV XL_WEB_PORT=2345 XL_DEBUG=0
 VOLUME [ "/xunlei/downloads", "/xunlei/data" ]
