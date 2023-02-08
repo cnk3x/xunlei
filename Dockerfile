@@ -14,7 +14,7 @@ WORKDIR /var/packages/pan-xunlei-com/target
 RUN if [ "$(uname -m)" = "aarch64" ]; then arch=armv8; else arch=$(uname -m); fi; \
     spkFn=$(find /spk -type f -name \*-${arch}.spk | head -n1); \
     if [ ! -f "${spkFn}" ]; then exit 1; fi; \
-    tar --wildcards -Oxf ${spkFn} package.tgz | tar --wildcards -xJ 'bin/bin/*' 'ui/index.cgi'; \
+    tar --wildcards -Oxf ${spkFn} package.tgz | tar --wildcards -xJ 'bin/bin/*' 'ui/*'; \
     mv bin/bin/* bin; rm -rf bin/bin
 
 WORKDIR /goxlp
