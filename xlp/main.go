@@ -12,7 +12,6 @@ import (
 const (
 	ENV_WEB_PORT    = "XL_WEB_PORT"
 	ENV_WEB_ADDRESS = "XL_WEB_ADDRESS"
-	ENV_WEB_PREFIX  = "XL_WEB_PREFIX"
 	ENV_DEBUG       = "XL_DEBUG"
 
 	rootfs  = "/xunlei"
