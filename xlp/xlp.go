@@ -92,7 +92,9 @@ func xlp(ctx context.Context) (err error) {
 	if optPort < 0 {
 		optPort = 2345
 	}
-	go fakeWeb(ctx, environs, optPort)
+	bindAddr := os.Getenv(ENV_WEB_ADDRESS)
+	webPrefix := os.Getenv(ENV_WEB_PREFIX)
+	go fakeWeb(ctx, environs, bindAddr, optPort, webPrefix)
 
 	if err = c.Wait(); err != nil {
 		err = fmt.Errorf("[xlp] [启动器] 结束: %w", err)
@@ -102,7 +104,13 @@ func xlp(ctx context.Context) (err error) {
 	return
 }
 
-func fakeWeb(ctx context.Context, environs []string, port int) {
+func addPrefixRoute(prefix, path string) string {
+	if prefix == "" {
+		return path
+	}
+	return filepath.Join(prefix, path)
+}
+func fakeWeb(ctx context.Context, environs []string, bindAddress string, port int, prefix string) {
 	synoToken := []byte(fmt.Sprintf(`{"SynoToken":"syno_%s"}`, randText(24)))
 	login := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -111,15 +119,15 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 	})
 	redirect := func(url string, code int) http.HandlerFunc {
 		return func(rw http.ResponseWriter, r *http.Request) {
-			http.Redirect(rw, r, url, code)
+			http.Redirect(rw, r, addPrefixRoute(prefix, url), code)
 		}
 	}
 
 	mux := http.NewServeMux()
 	home := fmt.Sprintf("/webman/3rdparty/%s/index.cgi", SYNOPKG_PKGNAME)
-	mux.Handle("/webman/login.cgi", login)
-	mux.Handle("/", redirect(home+"/", 307))
-	mux.Handle(home, redirect(home+"/", 307))
+	mux.Handle(addPrefixRoute(prefix, "/webman/login.cgi"), login)
+	mux.Handle(addPrefixRoute(prefix, "/"), redirect(home+"/", 307))
+	mux.Handle(addPrefixRoute(prefix, home), redirect(home+"/", 307))
 
 	indexCGI := &cgi.Handler{Path: fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR), Env: environs}
 	if !isDebug() {
@@ -132,7 +140,7 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 
 	mux.Handle(home+"/", basicAuth(indexCGI))
 
-	s := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
+	s := &http.Server{Addr: fmt.Sprintf("%s:%d", bindAddress, port), Handler: mux}
 	go func() {
 		<-ctx.Done()
 		_ = s.Shutdown(context.Background())
