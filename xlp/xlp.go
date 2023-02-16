@@ -129,7 +129,7 @@ func fakeWeb(ctx context.Context, environs []string, bindAddress string, port in
 	mux.Handle(addPrefixRoute(prefix, "/"), redirect(home+"/", 307))
 	mux.Handle(addPrefixRoute(prefix, home), redirect(home+"/", 307))
 
-	indexCGI := &cgi.Handler{Path: fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR), Env: environs}
+	indexCGI := &cgi.Handler{Path: addPrefixRoute(prefix, fmt.Sprintf("%s/ui/index.cgi", TARGET_DIR)), Env: environs}
 	if !isDebug() {
 		indexCGI.Stderr = io.Discard
 		indexCGI.Logger = log.New(io.Discard, "", 0)
@@ -138,7 +138,7 @@ func fakeWeb(ctx context.Context, environs []string, bindAddress string, port in
 		indexCGI.Logger = log.Default()
 	}
 
-	mux.Handle(home+"/", basicAuth(indexCGI))
+	mux.Handle(addPrefixRoute(prefix, home+"/"), basicAuth(indexCGI))
 
 	s := &http.Server{Addr: fmt.Sprintf("%s:%d", bindAddress, port), Handler: mux}
 	go func() {
