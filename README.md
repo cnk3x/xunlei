@@ -114,6 +114,10 @@ services:
       - /mnt/sdb1/downloads:/xunlei/downloads
     restart: unless-stopped
 ```
+# 镜像构建流程
+1. 前往迅雷NAS版本官网下载最新版本的迅雷套件，下载地址：https://nas.xunlei.com/
+2. 将1中下载的迅雷套件放置于`spk`目录下
+3. 执行`docker build -t xxx/xunlei --build-arg TARGETARCH={amd64|arm64} .`构建镜像
 
 ## 已知问题
 
