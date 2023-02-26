@@ -6,7 +6,7 @@
 
 [容器镜像: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
 
-[阿里云镜像（国内访问）: registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest](https://registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest)
+[阿里云镜像（国内访问）: registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest](#)
 
 [源码仓库: https://github.com/cnk3x/xunlei/tree/docker](https://github.com/cnk3x/xunlei/tree/docker)
 
@@ -125,3 +125,8 @@ services:
 ## systemd 服务版本
 
 <https://github.com/cnk3x/xunlei/tree/main>
+
+## Used By
+
+[kubespider](https://github.com/jwcesign/kubespider/blob/main/docs/zh/user_guide/thunder_install_config/README.md)
+
