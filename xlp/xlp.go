@@ -92,7 +92,8 @@ func xlp(ctx context.Context) (err error) {
 	if optPort < 0 {
 		optPort = 2345
 	}
-	go fakeWeb(ctx, environs, optPort)
+	bindAddr := os.Getenv(ENV_WEB_ADDRESS)
+	go fakeWeb(ctx, environs, bindAddr, optPort)
 
 	if err = c.Wait(); err != nil {
 		err = fmt.Errorf("[xlp] [启动器] 结束: %w", err)
@@ -102,7 +103,7 @@ func xlp(ctx context.Context) (err error) {
 	return
 }
 
-func fakeWeb(ctx context.Context, environs []string, port int) {
+func fakeWeb(ctx context.Context, environs []string, bindAddress string, port int) {
 	synoToken := []byte(fmt.Sprintf(`{"SynoToken":"syno_%s"}`, randText(24)))
 	login := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -114,7 +115,6 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 			http.Redirect(rw, r, url, code)
 		}
 	}
-
 	mux := http.NewServeMux()
 	home := fmt.Sprintf("/webman/3rdparty/%s/index.cgi", SYNOPKG_PKGNAME)
 	mux.Handle("/webman/login.cgi", login)
@@ -132,7 +132,7 @@ func fakeWeb(ctx context.Context, environs []string, port int) {
 
 	mux.Handle(home+"/", basicAuth(indexCGI))
 
-	s := &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: mux}
+	s := &http.Server{Addr: fmt.Sprintf("%s:%d", bindAddress, port), Handler: mux}
 	go func() {
 		<-ctx.Done()
 		_ = s.Shutdown(context.Background())

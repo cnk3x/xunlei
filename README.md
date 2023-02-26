@@ -6,11 +6,12 @@
 
 [容器镜像: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
 
-[阿里云镜像（国内访问）: registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest](#)
+[阿里云镜像（国内访问）: registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest](https://registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest)
 
 [源码仓库: https://github.com/cnk3x/xunlei/tree/docker](https://github.com/cnk3x/xunlei/tree/docker)
 
 - 环境变量 `XL_WEB_PORT`: 网页访问端口，默认 `2345`。
+- 环境变量 `XL_WEB_ADDRESS` 绑定端口，默认 `:port`
 - 环境变量 `XL_DEBUG`: 1 为调试模式，输出详细的日志信息，0: 关闭，不显示迅雷套件输出的日志，默认0.
 - 环境变量 `UID`, `GID`, 设定运行迅雷下载的用户，使用此参数注意下载目录必须是该账户有可写权限。
 - 环境变量 `XL_BA_USER` 和 `XL_BA_PASSWORD`: 给迅雷面板添加基本验证（明码）。 #57
@@ -112,6 +113,10 @@ services:
       - /mnt/sdb1/downloads:/xunlei/downloads
     restart: unless-stopped
 ```
+# 镜像构建流程
+1. 前往迅雷NAS版本官网下载最新版本的迅雷套件，下载地址：https://nas.xunlei.com/
+2. 将1中下载的迅雷套件放置于`spk`目录下
+3. 执行`docker build -t xxx/xunlei --build-arg TARGETARCH={amd64|arm64} .`构建镜像
 
 ## 已知问题
 
