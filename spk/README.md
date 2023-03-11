@@ -1,6 +1,8 @@
 将迅雷群晖套件的SPK文件放在这个目录
 
-下载地址: https://nas.xunlei.com/
+下载地址:  \
+https://nas.xunlei.com \
+https://docs.qq.com/doc/DQVJpbEVGZXV0anNa
 
 确保含有 *-armv8.spk 或者 *-x86_64.spk
 
