@@ -25,6 +25,8 @@ type Install struct {
 	Description string `flag:"description" alias:"d" usage:"服务描述" default:"迅雷远程下载服务"`
 	Port        int    `flag:"port" alias:"p" env:"XUNLEI_PORT" usage:"监听端口" default:"2345"`
 	Internal    bool   `flag:"internal" env:"XUNLEI_INTERNAL" usage:"仅本机访问，如果是通过反向代理来访问可选此项"`
+	UID         int    `flag:"uid" env:"PUID" usage:"用户权限"`
+	GID         int    `flag:"gid" env:"PGID" usage:"用户权限"`
 	DownloadDIR string `flag:"download-dir" alias:"dir" env:"XUNLEI_DOWNLOAD_DIR" usage:"下载保存目录" default:"/downloads"`
 }
 
@@ -56,6 +58,14 @@ func (c *Install) extract(ctx context.Context) error {
 		log.Infof("释放文件")
 		if err := dumpFs(targetFiles, "target", targetDIR, log); err != nil {
 			log.Fatalf("不成功: %v", err)
+		}
+
+		if err := os.Chown(SYNOPKG_PKGBASE, c.UID, c.GID); err != nil {
+			log.Fatalf("设置权限失败: %v", err)
+		}
+
+		if err := os.Chown(targetDIR, c.UID, c.GID); err != nil {
+			log.Fatalf("设置权限失败: %v", err)
 		}
 
 		rb := make([]byte, 32)
@@ -143,9 +153,10 @@ Type=simple
 ExecStart=/var/packages/pan-xunlei-com/xunlei run
 LimitNOFILE=1024
 LimitNPROC=512
+User=%d
 
 [Install]
-WantedBy=multi-user.target`, c.Description)
+WantedBy=multi-user.target`, c.Description, c.UID)
 
 	if err := os.WriteFile(unitFile, []byte(sUnit), 0666); err != nil {
 		return err
