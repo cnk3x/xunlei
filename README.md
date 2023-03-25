@@ -46,7 +46,7 @@ journalctl -fu xunlei
 1. 下载[官方的对应架构的群晖版迅雷spk文件](https://docs.qq.com/doc/DQVJpbEVGZXV0anNa)
 1. 用解压软件解压spk文件
 1. 找到里面的 package.tgz, 再解压一次
-1. 找到里面的文件: `xunlei-pan-cli-launcher`, `xunlei-pan-cli.版本号.amd64`, `index.cgi`
+1. 找到里面的文件: `xunlei-pan-cli-launcher.amd64`, `xunlei-pan-cli.版本号.amd64`, `index.cgi`
 1. 找到里面的文件: 与 `xunlei-pan-cli.版本号.amd64` 同目录的version文件
 1. 将 `index.cgi` 改名为 `xunlei-pan-cli-web`
 1. 将这四个文件复制到源码target目录

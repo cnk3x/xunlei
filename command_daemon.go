@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 	SYNOPKG_PKGBASE           = "/var/packages/" + SYNOPKG_PKGNAME
 	SYNOPKG_PKGDEST           = SYNOPKG_PKGBASE + "/target"
 	SYNOPKG_VAR               = SYNOPKG_PKGDEST + "/var/"
-	LAUNCHER_EXE              = SYNOPKG_PKGDEST + "/xunlei-pan-cli-launcher"
+	LAUNCHER_EXE              = SYNOPKG_PKGDEST + "/xunlei-pan-cli-launcher." + runtime.GOARCH
 	LAUNCHER_SOCK             = "unix://" + SYNOPKG_VAR + SYNOPKG_PKGNAME + "-launcher.sock"
 	SOCK_FILE                 = "unix://" + SYNOPKG_VAR + SYNOPKG_PKGNAME + ".sock"
 	PID_FILE                  = SYNOPKG_VAR + SYNOPKG_PKGNAME + ".pid"
