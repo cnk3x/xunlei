@@ -1,6 +1,7 @@
 [![docker hub pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei) [![docker hub version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei) [![GitHub Repo stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://github.com/cnk3x/xunlei) 
 
 
+
 # 迅雷远程下载服务(docker)(非官方)
 
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供测试，测试完请大家自觉删除。
@@ -116,7 +117,8 @@ services:
       - /mnt/sdb1/downloads:/xunlei/downloads
     restart: unless-stopped
 ```
-# 镜像构建流程
+
+## 镜像构建流程
 1. 前往迅雷NAS版本官网下载最新版本的迅雷套件，下载地址：https://nas.xunlei.com/
 2. 将1中下载的迅雷套件放置于`spk`目录下
 3. 执行`docker build -t xxx/xunlei --build-arg TARGETARCH={amd64|arm64} .`构建镜像
@@ -132,4 +134,8 @@ services:
 ## Used By
 
 [kubespider](https://github.com/jwcesign/kubespider/blob/main/docs/zh/user_guide/thunder_install_config/README.md)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=cnk3x/xunlei&type=Date)](https://star-history.com/#cnk3x/xunlei&Date)
 
