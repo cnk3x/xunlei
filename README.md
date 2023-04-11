@@ -1,3 +1,6 @@
+[![docker hub pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei) [![docker hub version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei) [![GitHub Repo stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://github.com/cnk3x/xunlei) 
+
+
 # 迅雷远程下载服务(docker)(非官方)
 
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供测试，测试完请大家自觉删除。
