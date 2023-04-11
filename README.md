@@ -5,7 +5,7 @@
 
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供测试，测试完请大家自觉删除。
 
-下载保存目录 `/xunlei/data`， 对应迅雷应用内显示的下载路径是 `/downloads` 或者 `/迅雷下载`
+下载保存目录 `/xunlei/downloads`， 对应迅雷应用内显示的下载路径是 `/downloads` 或者 `/迅雷下载`
 
 [容器镜像: cnk3x/xunlei](https://hub.docker.com/r/cnk3x/xunlei)
 
