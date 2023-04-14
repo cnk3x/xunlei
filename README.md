@@ -1,4 +1,6 @@
-[![docker hub pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei) [![docker hub version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei) [![GitHub Repo stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://github.com/cnk3x/xunlei) 
+[![Docker Pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei) 
+[![Docker Version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei) 
+[![GitHub Stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://star-history.com/#cnk3x/xunlei&Date) 
 
 
 
@@ -134,8 +136,3 @@ services:
 ## Used By
 
 [kubespider](https://github.com/jwcesign/kubespider/blob/main/docs/zh/user_guide/thunder_install_config/README.md)
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=cnk3x/xunlei&type=Date)](https://star-history.com/#cnk3x/xunlei&Date)
-
