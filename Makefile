@@ -1,4 +1,4 @@
-VERSION := 3.5.2
+VERSION := 3.7.1
 HOMER := $(shell cat home.repo.txt)
 GHR := ghcr.io/cnk3x
 ALIR := registry.cn-shenzhen.aliyuncs.com/cnk3x
