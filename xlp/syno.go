@@ -17,7 +17,7 @@ func syno(ctx context.Context) (err error) {
 	// 	return fmt.Errorf("[syno] 只能在 docker 中运行")
 	// }
 
-	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin", "/mnt"}
+	optionalBinds := []string{"/run", "/lib", "/lib64", "/lib32", "/libx32", "/usr", "/bin", "/sbin", "/mnt", "/tmp", "/proc"}
 	mustBinds := []string{"/dev", "/sys", TARGET_DIR}
 
 	files := []string{
