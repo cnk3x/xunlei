@@ -4,9 +4,8 @@
 [![Docker Version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei)
 [![GitHub Stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://star-history.com/#cnk3x/xunlei&Date)
 
-从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供研究学习测试。
-本程序未对原版迅雷程序进行任何修改。
-仅仅提供Linux模拟和容器化运行环境。
+从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供研究学习测试。 \
+本程序仅提供Linux模拟和容器化运行环境，未对原版迅雷程序进行任何修改。
 
 ## 安装
 
