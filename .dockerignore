@@ -3,3 +3,5 @@
 !spk/
 !bin/
 !update/
+!files
+!*.sh

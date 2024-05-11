@@ -6,3 +6,7 @@ local/
 /bin
 home.repo
 home.repo.txt
+rootfs/
+files/
+testdata/
+pkgctl.py
