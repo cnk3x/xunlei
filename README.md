@@ -1,4 +1,4 @@
-# 迅雷远程下载服务(docker)(非官方)
+# 迅雷远程下载服务(非官方)
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei)
 [![Docker Version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei)
