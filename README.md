@@ -1,58 +1,80 @@
 # 迅雷远程下载服务(非官方)
 
-## 说明
+[![Docker Pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei)
+[![Docker Version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei)
+[![GitHub Stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://star-history.com/#cnk3x/xunlei&Date)
 
-从迅雷群晖套件中提取出来用于其他Linux设备的迅雷远程下载服务程序。**已支持docker**
+从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供研究学习测试。 \
+本程序仅提供Linux模拟和容器化运行环境，未对原版迅雷程序进行任何修改。
 
-本程序 **不要在群晖的机器上运行！** **不要在群晖的机器上运行！** **不要在群晖的机器上运行！** 群晖的机器使用迅雷官方提供的套件即可
+## 安装
 
-**提 issue 请一定要注明使用方式：docker 还是 本机服务运行， 是否root账号运行， arm64 还是 x86_64。**
+当前支持容器中非特权运行。
 
-## 一键安装
+### Docker
 
-```sh
-# 安装
-sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/install.sh)" - install --port=2345 --download-dir=/download
-# 上面命令后面的参数 --port=后面接端口号, --download-dir=接下载文件夹，按自己的需求改
-# 下载文件夹装好后没得改了，要改的话，卸载重装，或者用软链接
-# 有时候安装失败，可以先运行卸载一次，再安装
-# 启动后，浏览器访问你的设备地址+端口号绑定迅雷就可以了。 比如： http://192.168.3.11:2345
-# 当前版本支持迅雷官方公测前的在线更新(不需要重新安装)
+#### 镜像
 
-# 卸载
-sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall.sh)"
+```plain
+cnk3x/xunlei:latest
+registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
+```
 
-# 卸载旧版本v2.1.x
-sh -c "$(curl -fSsL https://raw.githubusercontent.com/cnk3x/xunlei/main/uninstall_old.sh)"
+#### 环境变量参数
 
-# 服务控制
-# 启动
-systemctl start xunlei
-# 停止
-systemctl stop xunlei
-# 状态
-systemctl status xunlei
-# 查看日志(ctrl+c退出日志查看)
-journalctl -fu xunlei
+```bash
+XL_DASHBOARD_PORT      #网页访问的端口
+XL_DASHBOARD_HOST      #网页访问的地址
+XL_DASHBOARD_USER      #网页访问的用户名
+XL_DASHBOARD_PASSWORD  #网页访问的密码
+XL_DIR_DOWNLOAD        #下载保存默认文件夹，默认 /xunlei/downloads
+XL_DIR_DATA            #程序数据保存文件夹，默认 /xunlei/data
+XL_LOG                 #日志文件输出目标，默认为 null, 可选 file, console
+XL_LOGGER_MAXSIZE      #日志文件最大大小
+XL_LOGGER_COMPRESS     #是否压缩日志文件
+```
+
+#### 在容器中运行
+
+```bash
+# docker run -d \
+#   -v <数据目录>:/data \
+#   -v <默认下载保存目录>:/downloads \
+#   -p <访问端口>:2345 \
+#   cnk3x/xunlei
+
+# example
+docker run -d -v  /mnt/sdb1/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 cnk3x/xunlei
+```
+
+也可以直接运行
+
+```bash
+Usage of xlp:
+  -dashboard-host string
+        网页控制台访问绑定主机或IP, 不明白留空即可
+  -dashboard-password string
+        网页控制台访问密码
+  -dashboard-port int
+        网页控制台访问端口，默认 2345
+  -dashboard-user string
+        网页控制台访问用户名
+  -dir-data string
+        迅雷程序数据保存文件夹，默认 /xunlei/data
+  -dir-download string
+        默认下载保存文件夹，默认 /xunlei/downloads
+  -log string
+        日志输出位置, 可选 null, console, file
+  -log-compress
+        日志文件是否压缩
+  -log-maxsize string
+        日志文件最大大小
 ```
 
 ## 更新
 
-使用应用内更新的功能
+重构了外壳程序，Docker镜像的基础包升级到 v3.12.0
 
-## 自行编译
+## Used By
 
-克隆源码
-1. 下载[官方的对应架构的群晖版迅雷spk文件](https://docs.qq.com/doc/DQVJpbEVGZXV0anNa)
-1. 用解压软件解压spk文件
-1. 找到里面的 package.tgz, 再解压一次
-1. 找到里面的文件: `xunlei-pan-cli-launcher.amd64`, `xunlei-pan-cli.版本号.amd64`, `index.cgi`
-1. 找到里面的文件: 与 `xunlei-pan-cli.版本号.amd64` 同目录的version文件
-1. 将 `index.cgi` 改名为 `xunlei-pan-cli-web`
-1. 将这四个文件复制到源码target目录
-1. 改你要改的，改完后编译。
-
-## Docker
-
-https://github.com/cnk3x/xunlei/tree/docker
-
+[kubespider](https://github.com/opennaslab/kubespider/blob/main/docs/zh/user_guide/thunder_install_config/README.md)
