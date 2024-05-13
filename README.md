@@ -25,7 +25,7 @@ registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
 ```bash
 XL_DASHBOARD_PORT      #网页访问的端口
 XL_DASHBOARD_HOST      #网页访问的地址
-XL_DASHBOARD_USER      #网页访问的用户名
+XL_DASHBOARD_USERNAME  #网页访问的用户名
 XL_DASHBOARD_PASSWORD  #网页访问的密码
 XL_DIR_DOWNLOAD        #下载保存默认文件夹，默认 /xunlei/downloads
 XL_DIR_DATA            #程序数据保存文件夹，默认 /xunlei/data
