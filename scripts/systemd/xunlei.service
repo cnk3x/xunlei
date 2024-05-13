@@ -7,12 +7,12 @@ Type=simple
 ExecStart=/usr/local/bin/xlp
 
 Environment=XL_LOG=file
-Environment=XL_DIR_DATA=/data
-Environment=XL_DIR_DOWNLOAD=/downloads
+Environment=XL_DIR_DATA=/xunlei/data
+Environment=XL_DIR_DOWNLOAD=/xunlei/downloads
 Environment=XL_DASHBOARD_HOST=
-Environment=XL_DASHBOARD_PASSWORD=
 Environment=XL_DASHBOARD_PORT=2345
-Environment=XL_DASHBOARD_USER=
+Environment=XL_DASHBOARD_USERNAME=
+Environment=XL_DASHBOARD_PASSWORD=
 
 TimeoutStopSec=5s
 LimitNOFILE=1048576
