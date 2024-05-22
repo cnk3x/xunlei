@@ -17,7 +17,7 @@ buildEmbed::
 	cp -f embeds/nasxunlei-arm64.rpk embeds/nasxunlei.rpk 
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags '-s -w' -tags embed -v -o bin/xlp-arm64-embed ./cmd/xlp
 
-version:: build
+versioned:: build
 	docker buildx build --push --platform linux/amd64,linux/arm64 \
 	-t $(GHR)/xunlei:$(VERSION)  \
 	-t $(ALIR)/xunlei:$(VERSION) \
@@ -40,9 +40,12 @@ nasxunlei::
 	-t $(HUB)/xunlei:latest \
 	.
 
-home:: build
-	docker buildx build --push --platform linux/amd64,linux/arm64 \
-	-t $(shell cat home.repo.txt)/xunlei:$(VERSION) -t $(shell cat home.repo.txt)/xunlei:latest \
+home::
+	@# linux/arm64
+	rm -f bin/xlp-amd64
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-s -w' -v -o bin/xlp-amd64 ./cmd/xlp
+	docker buildx build --push --platform linux/amd64 \
+	-t $(shell cat home.repo.txt)/xunlei:latest \
 	.
 
 testBuild::

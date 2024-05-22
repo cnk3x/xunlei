@@ -1,12 +1,9 @@
 tmp/
 local/
 .vscode/
-/data
-/downloads
-/bin
-home.repo
+!.vscode/settings.json
+
+bin/
 home.repo.txt
-rootfs/
-files/
 testdata/
-pkgctl.py
+xlp/copier/

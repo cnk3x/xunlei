@@ -1,0 +1,20 @@
+services:
+  xunlei:
+    container_name: xunlei
+    image: code.wen.cx/hxnas/xunlei:latest
+    command: ["/bin/xlp", "--root", "/xunlei", "--dir-data", "/data", "--dir-download", "/downloads"]
+    environment:
+      - XL_DEBUG=1
+    volumes:
+      - ./config:/xunlei/data
+      - ./downloads:/xunlei/downloads
+    ports:
+      - 2345:2345
+      - 2346:2346
+    privileged: true
+    restart: no
+
+networks:
+  default:
+    name: hxnas
+    external: true

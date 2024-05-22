@@ -14,16 +14,24 @@ RUN mkdir -p /rootfs/etc/ssl/certs \
 
 # RUN curl -SsL https://github.com/upx/upx/releases/download/v4.2.3/upx-4.2.3-${TARGETARCH}_linux.tar.xz | tar -xJC /bin --strip-components 1 --wildcards '*/upx'
 
-COPY spk/*.spk /spk/
+WORKDIR /spk
+COPY spk/*.spk ./
 
 ENV SPK_TARGET=/rootfs/var/packages/pan-xunlei-com/target
 
-# 从spk中提取所需要的文件
-RUN arch=$([ "${TARGETARCH}" = "arm64" ] && echo "armv8" || uname -m) \
-  && spk=/spk/$(ls /spk | grep "${arch}.spk" | head -n1) \
-  && ([ -f "${spk}" ] && echo "spk found ${spk}" || exit 1) \
+RUN SYS_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo "x86_64" || echo "armv8") \
+  && VER=$(ls | grep "${SYS_ARCH}" | grep -Eo "v[0-9]+.[0-9]+.[0-9]+" | sort -Vr | head -n1 | sed 's/v//g') \
+  && NAME=$(ls | grep ${SYS_ARCH} | grep ${VER} | head -n1) \
   && mkdir -p ${SPK_TARGET} \
-  && (tar -Oxf ${spk} package.tgz | tar --wildcards -xJC ${SPK_TARGET} 'bin/bin/*' 'ui/index.cgi')
+  && [ -f "${NAME}" ] && tar -x -O -f ${NAME} package.tgz | tar -x -J -C ${SPK_TARGET} --wildcards 'bin/bin/*' 'ui/index.cgi' \
+  || exit 1
+
+# # 从spk中提取所需要的文件
+# RUN arch=$([ "${TARGETARCH}" = "arm64" ] && echo "armv8" || uname -m) \
+#   && spk=/spk/$(ls /spk | grep "${arch}.spk" | head -n1) \
+#   && ([ -f "${spk}" ] && echo "spk found ${spk}" || exit 1) \
+#   && mkdir -p ${SPK_TARGET} \
+#   && (tar -Oxf ${spk} package.tgz | tar --wildcards -xJC ${SPK_TARGET} 'bin/bin/*' 'ui/index.cgi')
 
 # 提取所需要的so库文件
 RUN mkdir -p /rootfs/lib/ \
@@ -48,15 +56,10 @@ FROM busybox:latest
 COPY --from=tmp /rootfs/ /
 
 ENV XL_DASHBOARD_PORT=2345 \
-  XL_DASHBOARD_HOST= \
   XL_DASHBOARD_USERNAME= \
   XL_DASHBOARD_PASSWORD= \
-  XL_DIR_DOWNLOAD=/xunlei/downloads \
-  XL_DIR_DATA=/xunlei/data \
-  XL_LOG=file \
-  XL_LOG_MAXSIZE=5M \
-  XL_LOG_COMPRESS=true
+  XL_DEBUG=0
 
 EXPOSE 2345
 VOLUME [ "/xunlei/data", "/xunlei/downloads" ]
-CMD [ "/bin/xlp" ]
+CMD [ "/bin/xlp", "--chroot", "/xunlei" ]

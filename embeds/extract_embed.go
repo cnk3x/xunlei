@@ -6,12 +6,13 @@ import (
 	"archive/tar"
 	"bytes"
 	_ "embed"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/sirupsen/logrus"
 )
 
 //go:embed nasxunlei.rpk
@@ -34,7 +35,7 @@ func Extract(target string) (err error) {
 		var fw *os.File
 		if fw, err = os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666); err != nil {
 			if os.IsExist(err) {
-				logrus.Warnf("  - [WARN] %s is exist. ignore %s", dstPath, h.Name)
+				slog.Warn(fmt.Sprintf("  - %s is exist. ignore %s", dstPath, h.Name))
 				err = nil
 			}
 			return
@@ -50,11 +51,11 @@ func Extract(target string) (err error) {
 			return
 		}
 
-		logrus.Infof("  - %s => %s ...ok", h.Name, dstPath)
+		slog.Info(fmt.Sprintf("  - %s => %s ...ok", h.Name, dstPath))
 		return
 	}
 
-	logrus.Infof("extract embed xunlei to %s", target)
+	slog.Info("extract embed xunlei", "target", target)
 	tr := tar.NewReader(d)
 	for h, e := tr.Next(); e != io.EOF; h, e = tr.Next() {
 		if e != nil {
