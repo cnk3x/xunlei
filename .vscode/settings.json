@@ -1,0 +1,9 @@
+{
+  "gopls": {
+    "build.buildFlags": ["-tags=embed"],
+    "build.env": {
+      "GO111MODULE": "on",
+      "GOOS": "linux"
+    }
+  }
+}

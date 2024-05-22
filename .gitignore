@@ -1,6 +1,6 @@
 tmp/
 local/
-.vscode/
+.vscode/*
 !.vscode/settings.json
 
 bin/

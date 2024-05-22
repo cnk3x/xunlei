@@ -57,7 +57,15 @@ func New() *Daemon {
 }
 
 // 模拟环境启动器
-type Daemon struct{ cfg Config }
+type Daemon struct {
+	cfg Config
+	ver string
+}
+
+func (d *Daemon) Version(ver string) *Daemon {
+	d.ver = ver
+	return d
+}
 
 func (d *Daemon) BindFlag(fs flagSet, parse bool) *Daemon {
 	d.cfg.BindFlag(fs, parse)
@@ -119,7 +127,7 @@ func (d *Daemon) directRun(ctx context.Context) (err error) {
 }
 
 func (d *Daemon) forkRun(ctx context.Context) (err error) {
-	return NewRoot(d.cfg.Chroot).WithOSEnv().AppendEnv(d.cfg.MarshalEnv()...).
+	return NewRoot(d.cfg.Chroot).AppendOSEnv(d.cfg.MarshalEnv()...).
 		Bind("/dev", "/lib", "/etc", "/var", "/bin", "/tmp", "/sys").
 		Bind(d.cfg.DirData, d.cfg.DirDownload).
 		Run(ctx)
@@ -144,7 +152,8 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	slog.Info(`_  _ _  _ _  _ _    ____  _`)
 	slog.Info(` \/  |  | |\ | |    |___  |`)
 	slog.Info(`_/\_ |__| | \| |___ |___  |`)
-	slog.Info(fmt.Sprintf(`version: %s`, SYNOPKG_PKGVER))
+	slog.Info(fmt.Sprintf(`daemon version: %s`, d.ver))
+	slog.Info(fmt.Sprintf(`spk version: %s`, SYNOPKG_PKGVER))
 	slog.Info(``)
 
 	slog.Info("Config")
@@ -177,24 +186,6 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	env.Set("HOME", DRIVE_PATH)
 	env.Set("TLSInsecureSkipVerify", "true")
 	env.Set("GIN_MODE", "release")
-
-	// environs := append(os.Environ(),
-	// 	"SYNOPLATFORM="+SYNOPLATFORM,
-	// 	"SYNOPKG_PKGNAME="+SYNOPKG_PKGNAME,
-	// 	"SYNOPKG_PKGVER="+SYNOPKG_PKGVER,
-	// 	"SYNOPKG_PKGDEST="+SYNOPKG_PKGDEST,
-	// 	"SYNOPKG_DSM_VERSION_MAJOR="+SYNOPKG_DSM_VERSION_MAJOR,
-	// 	"SYNOPKG_DSM_VERSION_MINOR="+SYNOPKG_DSM_VERSION_MINOR,
-	// 	"SYNOPKG_DSM_VERSION_BUILD="+SYNOPKG_DSM_VERSION_BUILD,
-	// 	"DriveListen=unix://"+DRIVE_LISTEN_PATH,
-	// 	"PLATFORM=群晖",
-	// 	"OS_VERSION="+OS_VERSION,
-	// 	"ConfigPath="+CONFIG_PATH,
-	// 	"DownloadPATH="+DOWNLOAD_PATH,
-	// 	"HOME="+DRIVE_PATH,
-	// 	"TLSInsecureSkipVerify=true",
-	// 	"GIN_MODE=release",
-	// )
 
 	slog.Info("Environ")
 	env.Each(func(k, v string) { slog.Info(fmt.Sprintf("  - %s=%s", k, v)) })

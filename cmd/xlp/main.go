@@ -11,8 +11,10 @@ import (
 	"github.com/lmittmann/tint"
 )
 
+var version = "unknown"
+
 func main() {
-	d := xlp.New().BindFlag(flag.CommandLine, true)
+	d := xlp.New().Version(version).BindFlag(flag.CommandLine, true)
 
 	slog.SetDefault(
 		slog.New(
@@ -29,5 +31,6 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+
 	d.Run(ctx)
 }

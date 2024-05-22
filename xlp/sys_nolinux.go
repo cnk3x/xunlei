@@ -20,3 +20,4 @@ func sysUnmount(string) (err error)       { return }
 func sysChroot(string) (err error)        { return }
 
 var _ = setupWrapProcAttr
+var _ = sysUnmount

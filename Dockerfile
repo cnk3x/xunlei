@@ -12,8 +12,6 @@ RUN mkdir -p /rootfs/etc/ssl/certs \
   && cp /usr/share/zoneinfo/Asia/Shanghai /rootfs/etc/localtime \
   && echo "Asia/Shanghai" >/rootfs/etc/timezone
 
-# RUN curl -SsL https://github.com/upx/upx/releases/download/v4.2.3/upx-4.2.3-${TARGETARCH}_linux.tar.xz | tar -xJC /bin --strip-components 1 --wildcards '*/upx'
-
 WORKDIR /spk
 COPY spk/*.spk ./
 
@@ -23,30 +21,18 @@ RUN SYS_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo "x86_64" || echo "armv8") \
   && VER=$(ls | grep "${SYS_ARCH}" | grep -Eo "v[0-9]+.[0-9]+.[0-9]+" | sort -Vr | head -n1 | sed 's/v//g') \
   && NAME=$(ls | grep ${SYS_ARCH} | grep ${VER} | head -n1) \
   && mkdir -p ${SPK_TARGET} \
-  && [ -f "${NAME}" ] && tar -x -O -f ${NAME} package.tgz | tar -x -J -C ${SPK_TARGET} --wildcards 'bin/bin/*' 'ui/index.cgi' \
+  && [ -f "${NAME}" ] && tar -Oxf ${NAME} package.tgz | tar -JxC ${SPK_TARGET} --wildcards 'bin/bin/*' 'ui/index.cgi' \
   || exit 1
-
-# # 从spk中提取所需要的文件
-# RUN arch=$([ "${TARGETARCH}" = "arm64" ] && echo "armv8" || uname -m) \
-#   && spk=/spk/$(ls /spk | grep "${arch}.spk" | head -n1) \
-#   && ([ -f "${spk}" ] && echo "spk found ${spk}" || exit 1) \
-#   && mkdir -p ${SPK_TARGET} \
-#   && (tar -Oxf ${spk} package.tgz | tar --wildcards -xJC ${SPK_TARGET} 'bin/bin/*' 'ui/index.cgi')
 
 # 提取所需要的so库文件
 RUN mkdir -p /rootfs/lib/ \
   && (find ${SPK_TARGET} -type f -exec ldd {} \; 2>/dev/null | grep "=>" | awk '{print $3}' | sort -u | xargs -I {} cp {} /rootfs/lib/)
-# RUN upx ${SPK_TARGET}/ui/index.cgi && ls ${SPK_TARGET}/bin/bin/xunlei* | xargs -I {} upx  ${SPK_TARGET}/bin/bin/{}
 
 COPY bin/xlp-${TARGETARCH} /rootfs/bin/xlp
-# RUN upx /rootfs/bin/xlp
 
 # 通过一个临时的镜像，过滤掉busybox已经存在的so库文件
 FROM busybox:latest as tmp
 ARG TARGETARCH
-
-RUN mkdir -p /rootfs/bin \
-  && echo "LD_TRACE_LOADED_OBJECTS=1 exec \$@" >/rootfs/bin/ldd && chmod +x /rootfs/bin/ldd
 
 COPY --from=spk /rootfs/ /rootfs/
 
@@ -58,7 +44,7 @@ COPY --from=tmp /rootfs/ /
 ENV XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_USERNAME= \
   XL_DASHBOARD_PASSWORD= \
-  XL_DEBUG=0
+  XL_DEBUG=1
 
 EXPOSE 2345
 VOLUME [ "/xunlei/data", "/xunlei/downloads" ]

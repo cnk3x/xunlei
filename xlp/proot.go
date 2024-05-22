@@ -44,8 +44,8 @@ func (p *Proot) AppendEnv(envirions ...string) *Proot {
 	return p
 }
 
-func (p *Proot) WithOSEnv() *Proot {
-	return p.AppendEnv(os.Environ()...)
+func (p *Proot) AppendOSEnv(extraEnvs ...string) *Proot {
+	return p.AppendEnv(os.Environ()...).AppendEnv(extraEnvs...)
 }
 
 func (p *Proot) Environ() []string {
@@ -74,15 +74,15 @@ func (p *Proot) Run(ctx context.Context, args ...string) (err error) {
 	}
 
 	var endpoints []string
-	defer func() {
-		for _, endpoint := range endpoints {
-			if err := sysUnmount(endpoint); err == nil {
-				slog.Debug("unmounted", "endpoint", endpoint)
-			} else {
-				slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
-			}
-		}
-	}()
+	// defer func() {
+	// 	for _, endpoint := range endpoints {
+	// 		if err := sysUnmount(endpoint); err == nil {
+	// 			slog.Debug("unmounted", "endpoint", endpoint)
+	// 		} else {
+	// 			slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
+	// 		}
+	// 	}
+	// }()
 
 	bind := func(sources ...string) (err error) {
 		for _, source := range sources {
@@ -151,9 +151,8 @@ func mount(source, endpoint string) (err error) {
 		}
 	}
 
-	if err != nil {
-		return
+	if err == nil {
+		err = sysMount(source, endpoint)
 	}
-	err = sysMount(source, endpoint)
 	return
 }
