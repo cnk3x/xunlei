@@ -13,29 +13,39 @@ MULTI_BUILDX := docker buildx build --push --platform linux/amd64,linux/arm64
 showTag:
 	@echo $(GITTAG)
 
-build-amd64::
+build_amd64::
 	rm -f bin/xlp-amd64
 	GOARCH=amd64 $(GO_BUILD) -o bin/xlp-amd64 ./cmd/xlp
 
-build-arm64::
+build_arm64::
 	rm -f bin/xlp-arm64
 	GOARCH=arm64 $(GO_BUILD) -o bin/xlp-arm64 ./cmd/xlp
 
-build-amd64-embed::
+build:: build_amd64 build_arm64
+
+build_embed_amd64::
 	rm -f bin/xlp-amd64-embed
 	cp -f embeds/nasxunlei-amd64.rpk embeds/nasxunlei.rpk 
 	GOARCH=amd64 $(GO_BUILD) -tags embed -v -o bin/xlp-amd64-embed ./cmd/xlp
 
-build-arm64-embed::
+build_embed_arm64::
 	rm -f bin/xlp-arm64-embed
 	cp -f embeds/nasxunlei-arm64.rpk embeds/nasxunlei.rpk 
 	GOARCH=arm64 $(GO_BUILD) -tags embed -v -o bin/xlp-arm64-embed ./cmd/xlp
 
-home:: build-amd64
+build_embed:: build_embed_amd64 build_embed_arm64
+
+home:: build_amd64
 	docker buildx build --push -t $(shell cat home.repo.txt)/xunlei:latest .
 
-latestPush:: build-amd64 build-arm64
+latestPush:: build
 	$(MULTI_BUILDX) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:latest .
 
-versionedPush:: build-amd64 build-arm64
+versionedPush:: build
 	$(MULTI_BUILDX) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) .
+
+build_binary:: build build_embed
+	gzip -c -9 -k bin/xlp-amd64 > bin/xlp-amd64.gz
+	gzip -c -9 -k bin/xlp-amd64-embed > bin/xlp-amd64-embed.gz
+	gzip -c -9 -k bin/xlp-arm64 > bin/xlp-arm64.gz
+	gzip -c -9 -k bin/xlp-arm64-embed > bin/xlp-arm64-embed.gz

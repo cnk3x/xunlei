@@ -16,6 +16,7 @@
 ```plain
 cnk3x/xunlei:latest
 registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
+ghcr.io/cnk3x/xunlei:latest
 ```
 
 **常规**的容器，还是要在特权模式下运行。
@@ -47,7 +48,10 @@ XL_LOGGER_COMPRESS     #是否压缩日志文件
 #   cnk3x/xunlei
 
 # example
-docker run -d -v  /mnt/sdb1/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 --privileged cnk3x/xunlei
+docker run -d -v /mnt/sdb1/configs/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 --privileged cnk3x/xunlei
+
+# 如果你的docker存储驱动不是overlay2, 比如 overlayfs 或者 btrfs, 可以不用特权运行
+docker run -d -v /mnt/sdb1/configs/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 cnk3x/xunlei xlp
 ```
 
 也可以直接运行
@@ -55,7 +59,7 @@ docker run -d -v  /mnt/sdb1/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/d
 ```bash
 Usage of xlp:
   -chroot string
-        CHROOT模式运行，用于在容器内。
+        CHROOT模式运行，用于在容器内。需要特权
   -dashboard-password string
         网页控制台访问密码
   -dashboard-port int

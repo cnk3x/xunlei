@@ -192,13 +192,28 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	slog.Info("Environ")
 	env.Each(func(k, v string) { slog.Info(fmt.Sprintf("  - %s=%s", k, v)) })
 
-	err = GroupCall(ctx,
+	var uid, gid uint32
+
+	if uid, gid, err = lookupUg(d.cfg.UID, d.cfg.GID); err != nil {
+		err = fmt.Errorf("lookup uid/gid fail: %w", err)
+		return
+	}
+
+	// 尝试处理一下权限
+	if uid != 0 {
+		chown(SYNOPKG_PKGDEST, uid, gid, true)
+		chmod(SYNOPKG_PKGDEST, os.ModePerm, true)
+		chown(d.cfg.DirData, uid, gid, true)
+		chown(d.cfg.DirData, uid, gid, true)
+		chown(d.cfg.DirDownload, uid, gid)
+		chmod(d.cfg.DirDownload, os.ModePerm)
+	}
+
+	if err = GroupCall(ctx,
 		symlink(d.cfg.DirData, DRIVE_PATH),
 		symlink(d.cfg.DirDownload, DOWNLOAD_PATH),
 		createParentDir(DRIVE_LISTEN_PATH),
-	)
-
-	if err != nil {
+	); err != nil {
 		return
 	}
 
@@ -214,35 +229,6 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 		"-logfile", LOG_LAUNCHER,
 		"-logsize", "1MB",
 	)
-
-	var uid, gid uint32
-	if uid, gid, err = lookupUg(d.cfg.UID, d.cfg.GID); err != nil {
-		err = fmt.Errorf("lookup uid/gid fail: %w", err)
-		return
-	}
-
-	if uid != 0 {
-		err = filepath.WalkDir(SYNOPKG_PKGDEST, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if err = os.Chown(path, int(uid), int(gid)); err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
-			return
-		}
-
-		if err = os.Chown(d.cfg.DirData, int(uid), int(gid)); err != nil {
-			return err
-		}
-
-		if err = os.Chown(d.cfg.DirDownload, int(uid), int(gid)); err != nil {
-			return err
-		}
-	}
 
 	setupProcAttr(c, uid, gid)
 
@@ -322,4 +308,26 @@ func (d *Daemon) mockHandler(environs []string) http.Handler {
 	})
 
 	return router
+}
+
+func chown(path string, uid, gid uint32, r ...bool) {
+	if len(r) > 0 && r[0] {
+		filepath.WalkDir(path, func(cur string, d fs.DirEntry, err error) error {
+			os.Chown(cur, int(uid), int(gid))
+			return nil
+		})
+	} else {
+		os.Chown(path, int(uid), int(gid))
+	}
+}
+
+func chmod(path string, perm fs.FileMode, r ...bool) {
+	if len(r) > 0 && r[0] {
+		filepath.WalkDir(path, func(cur string, d fs.DirEntry, err error) error {
+			os.Chmod(cur, perm)
+			return nil
+		})
+	} else {
+		os.Chmod(path, perm)
+	}
 }
