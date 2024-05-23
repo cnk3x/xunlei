@@ -17,7 +17,6 @@ const (
 	ENV_CHROOT             = "XL_CHROOT"             //CHROOT模式运行，用于在容器内。
 	ENV_PREVENT_UPDATE     = "XL_PREVENT_UPDATE"     //阻止更新
 
-	ENV_WEB_ADDRESS = "XL_WEB_ADDRESS" //旧的环境变量，标记过期: 网页访问的地址
 	ENV_BA_USER     = "XL_BA_USER"     //旧的环境变量，标记过期: 网页访问的用户名
 	ENV_BA_PASSWORD = "XL_BA_PASSWORD" //旧的环境变量，标记过期: 网页访问的密码
 
