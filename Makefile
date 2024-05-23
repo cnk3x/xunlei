@@ -3,7 +3,7 @@ GHR := ghcr.io/cnk3x
 ALIR := registry.cn-shenzhen.aliyuncs.com/cnk3x
 HUB := cnk3x
 
-GITTAG := $(shell git describe --tags --always --dirty)
+GITTAG := $(shell git describe --tags --always)
 LDFLAGS := -ldflags '-s -w -X main.version=$(GITTAG)'
 BUILD_FLAGS := -trimpath -v $(LDFLAGS)
 GO_BUILD := CGO_ENABLED=0 GOOS=linux go build $(BUILD_FLAGS)
