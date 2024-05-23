@@ -81,7 +81,7 @@ func lookupUg(userOrId, groupOrId string) (uid, gid uint32, err error) {
 	}
 
 	if g != nil {
-		gid, _ = parseUint(u.Gid)
+		gid, _ = parseUint(g.Gid)
 	}
 
 	return
