@@ -5,8 +5,8 @@ HUB := cnk3x
 
 GITTAG := $(shell git describe --tags --always --dirty)
 LDFLAGS := -ldflags '-s -w -X main.version=$(GITTAG)'
-BUILD_FLAGS :=-trimpath -v $(LDFLAGS)
-GO_BUILD := CGO_ENABLED=0 GOOS=linux go build
+BUILD_FLAGS := -trimpath -v $(LDFLAGS)
+GO_BUILD := CGO_ENABLED=0 GOOS=linux go build $(BUILD_FLAGS)
 
 MULTI_BUILDX := docker buildx build --push --platform linux/amd64,linux/arm64
 
