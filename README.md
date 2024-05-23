@@ -32,8 +32,8 @@ XL_DASHBOARD_PASSWORD  #网页访问的密码
 XL_DIR_DOWNLOAD        #下载保存默认文件夹，默认 /xunlei/downloads
 XL_DIR_DATA            #程序数据保存文件夹，默认 /xunlei/data
 XL_DEBUG               #调试模式, 可选值 true/false, 1/0
-XL_GUID                #运行迅雷的用户ID
-XL_GUID                #运行迅雷的用户组ID
+XL_UID                 #运行迅雷的用户ID
+XL_GID                 #运行迅雷的用户组ID
 ```
 
 #### 在容器中运行
