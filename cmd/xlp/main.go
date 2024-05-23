@@ -23,7 +23,7 @@ func main() {
 				&tint.Options{
 					TimeFormat: "01/02 15:04:05",
 					Level:      xlp.Iif(d.IsDebug(), slog.LevelDebug, slog.LevelInfo),
-					AddSource:  d.IsDebug(),
+					// AddSource:  d.IsDebug(),
 				},
 			),
 		),

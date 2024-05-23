@@ -128,7 +128,8 @@ func (d *Daemon) directRun(ctx context.Context) (err error) {
 
 func (d *Daemon) forkRun(ctx context.Context) (err error) {
 	return NewRoot(d.cfg.Chroot).AppendOSEnv(d.cfg.MarshalEnv()...).
-		Bind("/dev", "/lib", "/etc", "/var", "/bin", "/tmp", "/sys").
+		Bind("/dev", "/lib", "/etc", "/var", "/bin", "/tmp", "/usr").
+		BindOptional("/lib32", "/libx32", "/lib64", "/run", "/root", "/mnt").
 		Bind(d.cfg.DirData, d.cfg.DirDownload).
 		Run(ctx)
 }
@@ -153,7 +154,7 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	slog.Info(` \/  |  | |\ | |    |___  |`)
 	slog.Info(`_/\_ |__| | \| |___ |___  |`)
 	slog.Info(fmt.Sprintf(`daemon version: %s`, d.ver))
-	slog.Info(fmt.Sprintf(`spk version: %s`, SYNOPKG_PKGVER))
+	slog.Info(fmt.Sprintf(`spk version: v%s`, SYNOPKG_PKGVER))
 	slog.Info(``)
 
 	slog.Info("Config")
@@ -244,6 +245,8 @@ func (d *Daemon) mockSyno(ctx context.Context, environs []string) (err error) {
 	done := make(chan struct{})
 
 	s := &http.Server{Handler: d.mockHandler(environs), BaseContext: func(net.Listener) context.Context { return ctx }}
+	s.Addr = fmt.Sprintf(":%d", d.cfg.DashboardPort)
+	slog.Info("syno mock", "addr", s.Addr)
 
 	go func() {
 		select {
@@ -256,17 +259,12 @@ func (d *Daemon) mockSyno(ctx context.Context, environs []string) (err error) {
 
 	go func() {
 		defer close(done)
-
-		s.Addr = fmt.Sprintf(":%d", d.cfg.DashboardPort)
-		slog.Info("xlp starting", "addr", s.Addr)
-
 		if err := s.ListenAndServe(); err != nil {
 			if err != http.ErrServerClosed {
 				slog.Error("xlp done!", "err", err)
 				return
 			}
 		}
-
 		slog.Info("xlp is done!")
 	}()
 

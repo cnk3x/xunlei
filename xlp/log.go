@@ -3,13 +3,13 @@ package xlp
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -74,12 +74,15 @@ func loggerRedirect(ctx context.Context, c *exec.Cmd, debug bool) (err error) {
 	}
 
 	if err = c.Wait(); err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
-			slog.Error(fmt.Sprintf(name+" stopped: %s", string(ee.Stderr)))
-		} else {
-			err = fmt.Errorf(name+" stopped: %w", err)
+		if c.ProcessState != nil {
+			if status, ok := c.ProcessState.Sys().(syscall.WaitStatus); ok {
+				if status.Exited() && status.Signaled() {
+					slog.Info("exited", "signal", status.Signal().String())
+					return
+				}
+			}
 		}
+		err = fmt.Errorf(name+" stopped: %w", err)
 	}
 	return
 }

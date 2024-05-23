@@ -1,47 +1,47 @@
-FROM --platform=$BUILDPLATFORM debian:12-slim as spk
+FROM --platform=$BUILDPLATFORM ubuntu:focal as buildTemp
 ARG TARGETARCH
+
+LABEL org.opencontainers.image.authors "cnk3x"
+LABEL org.opencontainers.image.source https://github.com/cnk3x/xunlei
 
 RUN [ "${TARGETARCH}" = "arm64" -o "${TARGETARCH}" = "amd64" ] && echo ok || exit 1
 
-RUN apt-get update \
-  && apt-get -y --no-install-recommends install ca-certificates tzdata xz-utils curl \
-  && rm -rf /var/lib/apt/lists/*
+ENV LANG=C.UTF-8 LANG=zh_CN.UTF-8 LANGUAGE=zh_CN.UTF-8 LC_ALL=C
+
+RUN sed -i 's/archive.ubuntu.com/mirrors.bfsu.edu.cn/g' /etc/apt/sources.list \
+  && sed -i 's/security.ubuntu.com/mirrors.bfsu.edu.cn/g' /etc/apt/sources.list \
+  && sed -i 's/ports.ubuntu.com/mirrors.bfsu.edu.cn/g' /etc/apt/sources.list \
+  && DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y --no-install-recommends install tzdata ca-certificates xz-utils \
+  && rm -rf /var/lib/apt/lists/* \
+  && echo "Asia/Shanghai" >/etc/timezone \
+  && rm -f /etc/localtime && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
 RUN mkdir -p /rootfs/etc/ssl/certs \
   && cp --parents /etc/ssl/certs/ca-certificates.crt /rootfs/ \
-  && cp /usr/share/zoneinfo/Asia/Shanghai /rootfs/etc/localtime \
-  && echo "Asia/Shanghai" >/rootfs/etc/timezone
+  && cp --parents /etc/timezone /rootfs/ \
+  && cp --parents /etc/localtime /rootfs/
 
 WORKDIR /spk
-COPY spk/*.spk ./
 
-ENV SPK_TARGET=/rootfs/var/packages/pan-xunlei-com/target
+COPY spk/*.spk ./
 
 RUN SYS_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo "x86_64" || echo "armv8") \
   && VER=$(ls | grep "${SYS_ARCH}" | grep -Eo "v[0-9]+.[0-9]+.[0-9]+" | sort -Vr | head -n1 | sed 's/v//g') \
   && NAME=$(ls | grep ${SYS_ARCH} | grep ${VER} | head -n1) \
-  && mkdir -p ${SPK_TARGET} \
-  && [ -f "${NAME}" ] && tar -Oxf ${NAME} package.tgz | tar -JxC ${SPK_TARGET} --wildcards 'bin/bin/*' 'ui/index.cgi' \
+  && mkdir -p /rootfs/var/packages/pan-xunlei-com/target \
+  && [ -f "${NAME}" ] && tar -Oxf ${NAME} package.tgz | tar -JxC /rootfs/var/packages/pan-xunlei-com/target --wildcards 'bin/bin/*' 'ui/index.cgi' \
   || exit 1
 
-# 提取所需要的so库文件
-RUN mkdir -p /rootfs/lib/ \
-  && (find ${SPK_TARGET} -type f -exec ldd {} \; 2>/dev/null | grep "=>" | awk '{print $3}' | sort -u | xargs -I {} cp {} /rootfs/lib/)
+COPY bin/xlp-${TARGETARCH} /rootfs/usr/bin/xlp
 
-COPY bin/xlp-${TARGETARCH} /rootfs/bin/xlp
+FROM ubuntu:focal
 
-# 通过一个临时的镜像，过滤掉busybox已经存在的so库文件
-FROM busybox:latest as tmp
-ARG TARGETARCH
+ENV LANG=C.UTF-8 LANG=zh_CN.UTF-8 LANGUAGE=zh_CN.UTF-8 LC_ALL=C
 
-COPY --from=spk /rootfs/ /rootfs/
+COPY --from=buildTemp /rootfs/ /
 
-RUN find /rootfs/lib -maxdepth 1 -type f -exec sh -c '[ -f "/lib/$(basename {})" ] && rm -f {}' \;
-
-FROM busybox:latest
-COPY --from=tmp /rootfs/ /
-
-ENV XL_DASHBOARD_PORT=2345 \
+ENV \
+  XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_USERNAME= \
   XL_DASHBOARD_PASSWORD= \
   XL_DEBUG=1

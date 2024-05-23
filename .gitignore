@@ -7,3 +7,5 @@ bin/
 home.repo.txt
 testdata/
 xlp/copier/
+nasxunlei*
+*.Dockerfile

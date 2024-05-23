@@ -21,10 +21,16 @@ type Proot struct {
 
 	e *Env
 	s []string
+	o []string
 }
 
 func (p *Proot) Bind(sources ...string) *Proot {
 	p.s = append(p.s, sources...)
+	return p
+}
+
+func (p *Proot) BindOptional(sources ...string) *Proot {
+	p.o = append(p.o, sources...)
 	return p
 }
 
@@ -74,17 +80,17 @@ func (p *Proot) Run(ctx context.Context, args ...string) (err error) {
 	}
 
 	var endpoints []string
-	// defer func() {
-	// 	for _, endpoint := range endpoints {
-	// 		if err := sysUnmount(endpoint); err == nil {
-	// 			slog.Debug("unmounted", "endpoint", endpoint)
-	// 		} else {
-	// 			slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
-	// 		}
-	// 	}
-	// }()
+	defer func() {
+		for _, endpoint := range endpoints {
+			if err := sysUnmount(endpoint); err == nil {
+				slog.Debug("unmounted", "endpoint", endpoint)
+			} else {
+				slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
+			}
+		}
+	}()
 
-	bind := func(sources ...string) (err error) {
+	bind := func(optional bool, sources ...string) (err error) {
 		for _, source := range sources {
 			if source == "" {
 				return errors.New("source is empty")
@@ -92,21 +98,40 @@ func (p *Proot) Run(ctx context.Context, args ...string) (err error) {
 
 			endpoint := filepath.Join(root, source)
 			if err = mount(source, endpoint); err != nil {
-				return fmt.Errorf("mount %s to %s failed: %w", source, endpoint, err)
+				if !optional {
+					return fmt.Errorf("mount %s to %s failed: %w", source, endpoint, err)
+				} else {
+					slog.Warn("bind", "src", source, "err", err)
+					err = nil
+					continue
+				}
 			}
+
 			endpoints = append(endpoints, endpoint)
 			slog.Debug("mounted", "source", source, "endpoint", endpoint)
 		}
 		return
 	}
 
-	if err = bind(p.s...); err != nil {
+	if err = bind(false, p.s...); err != nil {
 		return
 	}
 
-	if err = bind(executable); err != nil {
+	if err = bind(true, p.o...); err != nil {
 		return
 	}
+
+	if err = bind(true, executable); err != nil {
+		return
+	}
+
+	// for _, ep := range endpoints {
+	// 	fmt.Println(ep)
+	// 	c := exec.CommandContext(ctx, "ls", "-lAhi", ep)
+	// 	c.Stdout = os.Stdout
+	// 	c.Stderr = os.Stderr
+	// 	c.Run()
+	// }
 
 	c := exec.CommandContext(ctx, executable, args...)
 	c.Stderr = os.Stderr
@@ -115,11 +140,11 @@ func (p *Proot) Run(ctx context.Context, args ...string) (err error) {
 
 	setupProcAttr(c, 0, 0)
 
-	slog.Info(_RUN_WITH_CHROOT, "root", root, "command", c)
+	slog.Info("fork", "root", root, "command", c)
 	if err = c.Start(); err != nil {
 		return
 	}
-	slog.Info(_RUN_WITH_CHROOT, "pid", c.Process.Pid)
+	slog.Info("fork", "pid", c.Process.Pid)
 
 	return c.Wait()
 }
