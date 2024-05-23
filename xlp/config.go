@@ -13,7 +13,7 @@ const (
 	ENV_DIR_DATA           = "XL_DIR_DATA"           //环境变量名称: 程序数据保存文件夹
 	ENV_XL_UID             = "XL_UID"                //运行迅雷的用户ID
 	ENV_XL_GID             = "XL_GID"                //运行迅雷的用户组ID
-	ENV_XL_DEBUG           = "XL_DEBUG"              //旧的环境变量，标记过期: 是否开启调试日志
+	ENV_XL_DEBUG           = "XL_DEBUG"              //是否开启调试日志
 	ENV_CHROOT             = "XL_CHROOT"             //CHROOT模式运行，用于在容器内。
 
 	ENV_WEB_ADDRESS = "XL_WEB_ADDRESS" //旧的环境变量，标记过期: 网页访问的地址

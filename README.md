@@ -27,14 +27,13 @@ ghcr.io/cnk3x/xunlei:latest
 
 ```bash
 XL_DASHBOARD_PORT      #网页访问的端口
-XL_DASHBOARD_HOST      #网页访问的地址
 XL_DASHBOARD_USERNAME  #网页访问的用户名
 XL_DASHBOARD_PASSWORD  #网页访问的密码
 XL_DIR_DOWNLOAD        #下载保存默认文件夹，默认 /xunlei/downloads
 XL_DIR_DATA            #程序数据保存文件夹，默认 /xunlei/data
-XL_LOG                 #日志文件输出目标，默认为 null, 可选 file, console
-XL_LOGGER_MAXSIZE      #日志文件最大大小
-XL_LOGGER_COMPRESS     #是否压缩日志文件
+XL_DEBUG               #调试模式, 可选值 true/false, 1/0
+XL_GUID                #运行迅雷的用户ID
+XL_GUID                #运行迅雷的用户组ID
 ```
 
 #### 在容器中运行
@@ -58,8 +57,6 @@ docker run -d -v /mnt/sdb1/configs/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/x
 
 ```bash
 Usage of xlp:
-  -chroot string
-        CHROOT模式运行，用于在容器内。需要特权
   -dashboard-password string
         网页控制台访问密码
   -dashboard-port int
