@@ -9,3 +9,4 @@ testdata/
 xlp/copier/
 nasxunlei*
 *.Dockerfile
+compose.yaml
