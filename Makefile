@@ -44,7 +44,7 @@ latestPush:: build
 versionedPush:: build
 	$(MULTI_BUILDX) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) .
 
-build_binary:: build build_embed
+binary:: build build_embed
 	gzip -c -9 -k bin/xlp-amd64 > bin/xlp-amd64.gz
 	gzip -c -9 -k bin/xlp-amd64-embed > bin/xlp-amd64-embed.gz
 	gzip -c -9 -k bin/xlp-arm64 > bin/xlp-arm64.gz
