@@ -40,8 +40,8 @@ XL_GUID                #运行迅雷的用户组ID
 
 ```bash
 # docker run -d \
-#   -v <数据目录>:/data \
-#   -v <默认下载保存目录>:/downloads \
+#   -v <数据目录>:/xunlei/data \
+#   -v <默认下载保存目录>:/xunlei/downloads \
 #   -p <访问端口>:2345 \
 #   --privileged \
 #   cnk3x/xunlei

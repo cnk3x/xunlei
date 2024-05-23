@@ -199,6 +199,10 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 		return
 	}
 
+	if err = GroupCall(ctx, createParentDir(DRIVE_LISTEN_PATH)); err != nil {
+		return
+	}
+
 	// 尝试处理一下权限
 	if uid != 0 {
 		chown(SYNOPKG_PKGDEST, uid, gid, true)
@@ -212,7 +216,6 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	if err = GroupCall(ctx,
 		symlink(d.cfg.DirData, DRIVE_PATH),
 		symlink(d.cfg.DirDownload, DOWNLOAD_PATH),
-		createParentDir(DRIVE_LISTEN_PATH),
 	); err != nil {
 		return
 	}
@@ -311,23 +314,29 @@ func (d *Daemon) mockHandler(environs []string) http.Handler {
 }
 
 func chown(path string, uid, gid uint32, r ...bool) {
-	if len(r) > 0 && r[0] {
-		filepath.WalkDir(path, func(cur string, d fs.DirEntry, err error) error {
-			os.Chown(cur, int(uid), int(gid))
-			return nil
-		})
-	} else {
-		os.Chown(path, int(uid), int(gid))
-	}
+	walkFiles(path, func(cur string) {
+		if err := os.Chown(cur, int(uid), int(gid)); err != nil {
+			slog.Warn("chown", "path", cur, "uid", uid, "gid", gid, "err", err)
+		} else {
+			slog.Debug("chown", "path", cur, "uid", uid, "gid", gid)
+		}
+	}, len(r) > 0 && r[0])
 }
 
 func chmod(path string, perm fs.FileMode, r ...bool) {
-	if len(r) > 0 && r[0] {
-		filepath.WalkDir(path, func(cur string, d fs.DirEntry, err error) error {
-			os.Chmod(cur, perm)
-			return nil
-		})
+	walkFiles(path, func(cur string) {
+		if err := os.Chmod(cur, perm); err != nil {
+			slog.Warn("chmod", "path", cur, "perm", perm.String(), "err", err)
+		} else {
+			slog.Debug("chmod", "path", cur, "perm", perm.String())
+		}
+	}, len(r) > 0 && r[0])
+}
+
+func walkFiles(root string, do func(cur string), r bool) {
+	if r {
+		filepath.WalkDir(root, func(cur string, _ fs.DirEntry, _ error) (err error) { do(cur); return })
 	} else {
-		os.Chmod(path, perm)
+		do(root)
 	}
 }

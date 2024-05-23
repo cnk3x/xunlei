@@ -44,8 +44,9 @@ ENV \
   XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_USERNAME= \
   XL_DASHBOARD_PASSWORD= \
-  XL_DEBUG=1
+  XL_DEBUG=0 \
+  XL_CHROOT=/xunlei
 
 EXPOSE 2345
 VOLUME [ "/xunlei/data", "/xunlei/downloads" ]
-CMD [ "/bin/xlp", "--chroot", "/xunlei" ]
+CMD [ "/bin/xlp" ]

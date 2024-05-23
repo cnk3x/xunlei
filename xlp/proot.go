@@ -84,8 +84,8 @@ func (p *Proot) Run(ctx context.Context, args ...string) (err error) {
 		for _, endpoint := range endpoints {
 			if err := sysUnmount(endpoint); err == nil {
 				slog.Debug("unmounted", "endpoint", endpoint)
-			} else {
-				slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
+				// } else {
+				// 	slog.Warn("unmount failed", "endpoint", endpoint, "err", err)
 			}
 		}
 	}()
