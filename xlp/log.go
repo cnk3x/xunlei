@@ -69,7 +69,7 @@ func loggerRedirect(ctx context.Context, c *exec.Cmd, debug bool) (err error) {
 		if ce := ParallelCall(ctx, readLog(spr, name+".1", debug), readLog(epr, name+".2", debug)); ce != nil {
 			slog.Warn("readlog done", "err", ce)
 		} else {
-			slog.Warn("readlog done")
+			slog.Info("readlog done")
 		}
 	}
 
@@ -77,12 +77,12 @@ func loggerRedirect(ctx context.Context, c *exec.Cmd, debug bool) (err error) {
 		if c.ProcessState != nil {
 			if status, ok := c.ProcessState.Sys().(syscall.WaitStatus); ok {
 				if status.Exited() && status.Signaled() {
-					slog.Info("exited", "signal", status.Signal().String())
+					slog.Info(name+" exited", "signal", status.Signal().String())
 					return
 				}
 			}
 		}
-		err = fmt.Errorf(name+" stopped: %w", err)
+		err = fmt.Errorf(name+" exited: %w", err)
 	}
 	return
 }

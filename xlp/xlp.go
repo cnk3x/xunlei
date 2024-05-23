@@ -3,6 +3,7 @@ package xlp
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -218,6 +219,29 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 	if uid, gid, err = lookupUg(d.cfg.UID, d.cfg.GID); err != nil {
 		err = fmt.Errorf("lookup uid/gid fail: %w", err)
 		return
+	}
+
+	if uid != 0 {
+		err = filepath.WalkDir(SYNOPKG_PKGDEST, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if err = os.Chown(path, int(uid), int(gid)); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return
+		}
+
+		if err = os.Chown(d.cfg.DirData, int(uid), int(gid)); err != nil {
+			return err
+		}
+
+		if err = os.Chown(d.cfg.DirDownload, int(uid), int(gid)); err != nil {
+			return err
+		}
 	}
 
 	setupProcAttr(c, uid, gid)
