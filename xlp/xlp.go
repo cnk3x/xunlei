@@ -308,6 +308,8 @@ func (d *Daemon) mockHandler(environs []string) http.Handler {
 
 		r.Handle(index+"*", hcgi)
 		r.Handle("GET /", redirect(index))
+		r.Handle("GET /web", redirect(index))
+		r.Handle("GET /webman", redirect(index))
 	})
 
 	return router
