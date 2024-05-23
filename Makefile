@@ -6,29 +6,36 @@ HUB := cnk3x
 GITTAG := $(shell git describe --tags --always --dirty)
 LDFLAGS := -ldflags '-s -w -X main.version=$(GITTAG)'
 BUILD_FLAGS :=-trimpath -v $(LDFLAGS)
+GO_BUILD := CGO_ENABLED=0 GOOS=linux go build
+
+MULTI_BUILDX := docker buildx build --push --platform linux/amd64,linux/arm64
 
 showTag:
 	@echo $(GITTAG)
 
 build-amd64::
 	rm -f bin/xlp-amd64
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o bin/xlp-amd64 ./cmd/xlp
+	GOARCH=amd64 $(GO_BUILD) -o bin/xlp-amd64 ./cmd/xlp
 
 build-arm64::
 	rm -f bin/xlp-arm64
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -o bin/xlp-arm64 ./cmd/xlp
+	GOARCH=arm64 $(GO_BUILD) -o bin/xlp-arm64 ./cmd/xlp
 
 build-amd64-embed::
 	rm -f bin/xlp-amd64-embed
 	cp -f embeds/nasxunlei-amd64.rpk embeds/nasxunlei.rpk 
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -tags embed -v -o bin/xlp-amd64-embed ./cmd/xlp
+	GOARCH=amd64 $(GO_BUILD) -tags embed -v -o bin/xlp-amd64-embed ./cmd/xlp
 
 build-arm64-embed::
 	rm -f bin/xlp-arm64-embed
 	cp -f embeds/nasxunlei-arm64.rpk embeds/nasxunlei.rpk 
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(BUILD_FLAGS) -tags embed -v -o bin/xlp-arm64-embed ./cmd/xlp
+	GOARCH=arm64 $(GO_BUILD) -tags embed -v -o bin/xlp-arm64-embed ./cmd/xlp
 
 home:: build-amd64
-	docker buildx build --push --platform linux/amd64 \
-	-t $(shell cat home.repo.txt)/xunlei:latest \
-	.
+	docker buildx build --push -t $(shell cat home.repo.txt)/xunlei:latest .
+
+latestPush:: build-amd64 build-arm64
+	$(MULTI_BUILDX) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:latest .
+
+versionedPush:: build-amd64 build-arm64
+	$(MULTI_BUILDX) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) .

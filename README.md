@@ -7,9 +7,7 @@
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供研究学习测试。 \
 本程序仅提供Linux模拟和容器化运行环境，未对原版迅雷程序进行任何修改。
 
-## 安装
-
-当前支持容器中非特权运行。
+## 使用
 
 ### Docker
 
@@ -19,6 +17,10 @@
 cnk3x/xunlei:latest
 registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
 ```
+
+**常规**的容器，还是要在特权模式下运行。
+
+如果docker的存储驱动如果是btrfs或者overlayfs，可以支持的非特权运行，可自行研究一下（去掉代码中的chmod，不加 --chroot 参数运行）。
 
 #### 环境变量参数
 
@@ -41,39 +43,36 @@ XL_LOGGER_COMPRESS     #是否压缩日志文件
 #   -v <数据目录>:/data \
 #   -v <默认下载保存目录>:/downloads \
 #   -p <访问端口>:2345 \
+#   --privileged \
 #   cnk3x/xunlei
 
 # example
-docker run -d -v  /mnt/sdb1/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 cnk3x/xunlei
+docker run -d -v  /mnt/sdb1/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 --privileged cnk3x/xunlei
 ```
 
 也可以直接运行
 
 ```bash
 Usage of xlp:
-  -dashboard-host string
-        网页控制台访问绑定主机或IP, 不明白留空即可
+  -chroot string
+        CHROOT模式运行，用于在容器内。
   -dashboard-password string
         网页控制台访问密码
   -dashboard-port int
-        网页控制台访问端口，默认 2345
-  -dashboard-user string
+        网页控制台访问端口 (default 2345)
+  -dashboard-username string
         网页控制台访问用户名
+  -debug
+        开启调试模式
   -dir-data string
-        迅雷程序数据保存文件夹，默认 /xunlei/data
+        迅雷程序数据保存文件夹
   -dir-download string
-        默认下载保存文件夹，默认 /xunlei/downloads
-  -log string
-        日志输出位置, 可选 null, console, file
-  -log-compress
-        日志文件是否压缩
-  -log-maxsize string
-        日志文件最大大小
+        默认下载保存文件夹
+  -gid string
+        运行迅雷的 GID
+  -uid string
+        运行迅雷的 UID
 ```
-
-## 更新
-
-重构了外壳程序，Docker镜像的基础包升级到 v3.12.0
 
 ## Used By
 
