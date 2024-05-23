@@ -42,6 +42,7 @@ const (
 	PATH_SYNO_INFO_CONF          = "/etc/synoinfo.conf"                                            //synoinfo.conf 文件路径
 	PATH_SYNO_AUTHENTICATE_CGI   = "/usr/syno/synoman/webman/modules/authenticate.cgi"             //syno...authenticate.cgi 文件路径
 	SYNO_AUTHENTICATE_CGI_SCRIPT = "#!/bin/sh\necho Content-Type: text/plain\necho;\necho admin\n" //syno...authenticate.cgi 文件内容
+	UPDATE_URL                   = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/version"
 )
 
 var (
@@ -224,14 +225,18 @@ func (d *Daemon) run(ctx context.Context) (err error) {
 		return
 	}
 
-	c := exec.CommandContext(
-		ctx,
-		PAN_XUNLEI_CLI,
-		"-launcher_listen", "unix://"+LAUNCHER_LISTEN_PATH,
+	var args = []string{
+		"-launcher_listen", "unix://" + LAUNCHER_LISTEN_PATH,
 		"-pid", PID_FILE,
 		"-logfile", LOG_LAUNCHER,
 		"-logsize", "1MB",
-	)
+	}
+
+	if d.cfg.PreventUpdate {
+		args = append(args, "-update_url", fmt.Sprintf("http://127.0.0.1:%d%s", d.cfg.DashboardPort, UPDATE_URL))
+	}
+
+	c := exec.CommandContext(ctx, PAN_XUNLEI_CLI, args...)
 
 	setupProcAttr(c, uid, gid)
 
@@ -294,6 +299,9 @@ func (d *Daemon) mockHandler(environs []string) http.Handler {
 	router := chi.NewMux()
 	router.Use(middleware.Recoverer)
 	router.Handle("/webman/login.cgi", Respond(fmt.Sprintf(`{"SynoToken":"syno_%s"}`, randText(24)), "application/json", http.StatusOK))
+	if d.cfg.PreventUpdate {
+		router.Handle("GET "+UPDATE_URL, preventUpdate())
+	}
 
 	router.Group(func(r chi.Router) {
 		index := fmt.Sprintf("/webman/3rdparty/%s/index.cgi/", SYNOPKG_PKGNAME)
@@ -340,5 +348,11 @@ func walkFiles(root string, do func(cur string), r bool) {
 		filepath.WalkDir(root, func(cur string, _ fs.DirEntry, _ error) (err error) { do(cur); return })
 	} else {
 		do(root)
+	}
+}
+
+func preventUpdate() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		Respond(fmt.Sprintf("arch: %s\nversion: \"0.0.1\"\naccept: [\"9.9.9\"]", runtime.GOARCH), `text/vnd.yaml`, 200)
 	}
 }

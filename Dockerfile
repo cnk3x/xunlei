@@ -44,8 +44,9 @@ ENV \
   XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_USERNAME= \
   XL_DASHBOARD_PASSWORD= \
-  XL_DEBUG=0 \
-  XL_CHROOT=/xunlei
+  XL_DEBUG=false \
+  XL_CHROOT=/xunlei \
+  XL_PREVENT_UPDATE=true
 
 EXPOSE 2345
 VOLUME [ "/xunlei/data", "/xunlei/downloads" ]
