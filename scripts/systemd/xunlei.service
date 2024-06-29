@@ -4,7 +4,7 @@ Documentation=https://github.com/cnk3x/xunlei
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/xlp -c /xunlei/config -d /xunlei/downloads --prevent_update --username admin --password '' --log info --addr ':2345'
+ExecStart=/usr/local/bin/xlp --dir_data /xunlei/config --dir_download /mnt/sdb1/downloads --dir_download /mnt/sdb1/movies --prevent_update --dashboard_port 2345 --dashboard_username admin --dashboard_password 123456 
 
 TimeoutStopSec=5s
 LimitNOFILE=1048576
