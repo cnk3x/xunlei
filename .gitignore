@@ -4,7 +4,7 @@ local/
 !.vscode/settings.json
 
 bin/
-home.repo.txt
+home.repo
 testdata/
 copier/
 nasxunlei*
