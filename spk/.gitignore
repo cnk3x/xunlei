@@ -2,3 +2,5 @@
 !.gitignore
 !README.md
 !.dockerignore
+!*.sh
+!*.go

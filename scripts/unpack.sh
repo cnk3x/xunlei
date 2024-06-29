@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
 
+cd $(dirname $0)
+cd ..
+
 SPK=$1
-SPK_TARGET=./testdata/spk
+SPK_TARGET=testdata/spk
 
 if [ -z "${SPK}" ]; then
   echo "usage: $0 <spk>"

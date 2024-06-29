@@ -1,36 +1,39 @@
+//go:build !windows && !darwin
+
 package main
 
 import (
 	"context"
-	"flag"
 	"log/slog"
 	"os"
 	"os/signal"
 
-	"github.com/cnk3x/xunlei/xlp"
-	"github.com/lmittmann/tint"
+	"github.com/cnk3x/xunlei"
+	"github.com/cnk3x/xunlei/pkg/flags"
+	"github.com/cnk3x/xunlei/pkg/lod"
+	"github.com/cnk3x/xunlei/pkg/log"
+	"github.com/cnk3x/xunlei/pkg/cmd"
 )
 
 var version = "unknown"
 
 func main() {
-	d := xlp.New().Version(version).BindFlag(flag.CommandLine, true)
+	flags.Default.SetVersion(version)
 
-	slog.SetDefault(
-		slog.New(
-			tint.NewHandler(
-				os.Stderr,
-				&tint.Options{
-					TimeFormat: "01/02 15:04:05",
-					Level:      xlp.Iif(d.IsDebug(), slog.LevelDebug, slog.LevelInfo),
-					// AddSource:  d.IsDebug(),
-				},
-			),
-		),
-	)
+	cfg := xunlei.ConfigDefault()
+	flags.Struct(&cfg)
+	flags.Parse()
+
+	log.ForDefault(lod.Iif(cfg.Debug, "debug", "info"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	d.Run(ctx)
+	ctx = log.Prefix(ctx, lod.Select(cmd.ForkTag(), "main"))
+
+	if err := xunlei.New(cfg, version).Run(ctx); err != nil {
+		slog.ErrorContext(ctx, "exited!", "err", err.Error())
+	} else {
+		slog.InfoContext(ctx, "exited!")
+	}
 }

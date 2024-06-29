@@ -1,0 +1,28 @@
+services:
+  xunlei:
+    container_name: xunlei
+    image: cnk3x/xunlei:latest
+    restart: unless-stopped
+
+    # XL_CHROOT 设置为 / 时，不需要特权模式，XL_DEBUG 设置为 true或者1时，会显示更多日志信息
+    # XL_DIR_DOWNLOAD 可以设定多个目录，用冒号分隔，如果不设置，默认为 /xunlei/downloads
+    environment:
+      - XL_DEBUG=false
+      - XL_CHROOT=/
+      - XL_DIR_DOWNLOAD=/xunlei/downloads:/xunlei/影音:/xunlei/软件
+
+    # /xunlei/data 映射必须，其他的对应环境变量的 XL_DIR_DOWNLOAD
+    volumes:
+      - ./data:/xunlei/data
+      - ./downloads:/xunlei/downloads
+      - ./mynas/影音:/xunlei/影音
+      - ./mynas/软件:/xunlei/软件
+    ports:
+      - 2345:2345
+    network_mode: "bridge" # 网络模式，如果是 host, 不需要上面的 ports 设置
+
+# 使用现有网络，去掉上面 network_mode，取消下面的注释
+# networks:
+#   default:
+#     name: hxnas
+#     external: true

@@ -6,7 +6,7 @@ local/
 bin/
 home.repo.txt
 testdata/
-xlp/copier/
+copier/
 nasxunlei*
 *.Dockerfile
-compose.yaml
+rootfs/

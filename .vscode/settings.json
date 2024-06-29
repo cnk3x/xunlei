@@ -3,7 +3,8 @@
     "build.buildFlags": ["-tags=embed"],
     "build.env": {
       "GO111MODULE": "on",
-      "GOOS": "linux"
+      "GOOS": "linux",
+      "GOARCH": "amd64"
     }
   }
 }
