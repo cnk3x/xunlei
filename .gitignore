@@ -2,11 +2,11 @@ tmp/
 local/
 .vscode/*
 !.vscode/settings.json
+.idea/
 
 bin/
-home.repo
-testdata/
-copier/
-nasxunlei*
-*.Dockerfile
 rootfs/
+home.repo
+
+testdata/
+*.Dockerfile

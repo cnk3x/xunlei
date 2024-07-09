@@ -21,8 +21,7 @@ type RunOption struct {
 
 func Run(ctx context.Context, name string, args []string, opts RunOption) (err error) {
 	xlc := exec.CommandContext(ctx, name, args...)
-	SetPdeathsig(ctx, xlc, syscall.SIGINT)
-	Setpgid(ctx, xlc)
+	SetupProcAttr(xlc, syscall.SIGINT, 0, 0)
 
 	xlc.Dir = opts.Dir
 	xlc.Env = opts.Env
@@ -60,9 +59,9 @@ func Run(ctx context.Context, name string, args []string, opts RunOption) (err e
 		g.Go(func() error { return readLog(c, spr) })
 		g.Go(func() error { return readLog(c, epr) })
 		if e := g.Wait(); e != nil {
-			slog.WarnContext(ctx, "readlog done", "err", e)
+			slog.WarnContext(ctx, "console done", "err", e)
 		} else {
-			slog.InfoContext(ctx, "readlog done")
+			slog.InfoContext(ctx, "console done")
 		}
 	}
 

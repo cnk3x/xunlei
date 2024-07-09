@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"github.com/cnk3x/xunlei/spk"
 )
 
+//goland:noinspection GoSnakeCaseUsage
 const (
 	SYNOPKG_DSM_VERSION_MAJOR = "7"     //系统的主版本
 	SYNOPKG_DSM_VERSION_MINOR = "2"     //系统的次版本
@@ -36,13 +38,12 @@ const (
 	SYNOPKG_PKGNAME = "pan-xunlei-com"                                     //包名
 	SYNOPKG_PKGROOT = "/var/packages/" + SYNOPKG_PKGNAME                   //包安装目录
 	SYNOPKG_PKGDEST = SYNOPKG_PKGROOT + "/target"                          //包安装目录
-	SYNOPKG_ETC     = SYNOPKG_PKGROOT + "/etc"                             //包安装目录
 	PID_FILE        = SYNOPKG_PKGDEST + "/var/" + SYNOPKG_PKGNAME + ".pid" //进程文件
 
 	PAN_XUNLEI_VER = SYNOPKG_PKGDEST + "/bin/bin/version"                                   //版本文件
 	PAN_XUNLEI_CLI = SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli-launcher." + runtime.GOARCH //启动器
-	PAN_XUNLEI_BIN = SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli.%s." + runtime.GOARCH       //主程序
-	PAN_XUNLEI_CGI = SYNOPKG_PKGDEST + "/ui/index.cgi"                                      //CGI文件
+	//PAN_XUNLEI_BIN = SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli.%s." + runtime.GOARCH       //主程序
+	//PAN_XUNLEI_CGI = SYNOPKG_PKGDEST + "/ui/index.cgi"                                      //CGI文件
 
 	LAUNCHER_LISTEN_PATH = SYNOPKG_PKGDEST + "/var/pan-xunlei-com-launcher.sock" //启动器监听地址
 	DRIVE_LISTEN_PATH    = SYNOPKG_PKGDEST + "/var/pan-xunlei-com.sock"          //主程序监听地址
@@ -52,20 +53,16 @@ const (
 	UPDATE_URL                 = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/version"
 )
 
+//goland:noinspection GoSnakeCaseUsage
 var (
 	SYNO_PLATFORM = lod.Iif(runtime.GOARCH == "amd64", "geminilake", "rtd1296")                                                             //平台
 	SYNO_MODEL    = lod.Iif(runtime.GOARCH == "amd64", "DS920+", "DS220j")                                                                  //平台
 	OS_VERSION    = SYNO_PLATFORM + " dsm " + SYNOPKG_DSM_VERSION_MAJOR + "." + SYNOPKG_DSM_VERSION_MINOR + "-" + SYNOPKG_DSM_VERSION_BUILD //系统版本
 )
 
-const (
-	TAG_CHILD  = "child"
-	TAG_CHROOT = "chroot"
-)
-
 func New(cfg Config, ver string) *Daemon { return &Daemon{cfg: cfg, ver: ver} }
 
-// 模拟环境启动器
+// Daemon 模拟环境启动器
 type Daemon struct {
 	cfg Config
 	ver string
@@ -83,80 +80,90 @@ func (d *Daemon) Run(ctx context.Context) (err error) {
 		Env:   os.Environ(),
 		Uid:   d.cfg.Uid,
 		Gid:   d.cfg.Gid,
-		RootRun: func(ctx context.Context) (err error) {
+		Main:  d.directRun,
+		PreRun: func(ctx context.Context) (err error) {
 			if iofs.IsFile("/.dockerenv") {
 				if err = os.Remove("/.dockerenv"); err != nil {
 					return
 				}
 			}
 
-			auth_cgi_script := "#!/bin/sh\necho Content-Type: text/plain\necho;\necho;\necho admin\n"
-			if err = iofs.WriteText(ctx, PATH_SYNO_AUTHENTICATE_CGI, auth_cgi_script, 0777); err != nil {
+			authPath := PATH_SYNO_AUTHENTICATE_CGI
+			authText := "#!/bin/sh\necho Content-Type: text/plain\necho;\necho;\necho admin\n"
+			if err = iofs.WriteText(ctx, authPath, authText, 0777); err != nil {
 				return
 			}
 
+			infoPath := PATH_SYNO_INFO_CONF
 			infoText := "platform_name=\"%s\"\nsynobios=\"%s\"\nunique=\"synology_%s_%s\""
 			infoText = fmt.Sprintf(infoText, SYNO_PLATFORM, SYNO_PLATFORM, SYNO_PLATFORM, SYNO_MODEL)
-			err = iofs.WriteText(ctx, PATH_SYNO_INFO_CONF, infoText, 0666)
-			return
-		},
-		UserRun: func(ctx context.Context, uid uint32, gid uint32) (err error) {
-			if err = os.MkdirAll(SYNOPKG_PKGROOT, 0777); err != nil {
+			if err = iofs.WriteText(ctx, infoPath, infoText, 0666); err != nil {
 				return
 			}
-			if err = os.Chown(SYNOPKG_PKGROOT, int(uid), int(gid)); err != nil {
-				return
-			}
-			return
-		},
 
-		Main: d.directRun,
+			dst := SYNOPKG_PKGDEST
+			err = os.RemoveAll(dst)
+			slog.Log(ctx, lod.ErrDebug(err), "remove dir", "path", dst, "err", err)
+			if err != nil {
+				return
+			}
+
+			err = os.MkdirAll(dst, 0777)
+			slog.Log(ctx, lod.ErrDebug(err), "create dir", "path", dst, "err", err)
+			if err != nil {
+				return
+			}
+
+			if d.cfg.Uid != 0 {
+				err = cmd.Chown(ctx, dst, d.cfg.Uid, d.cfg.Gid)
+			}
+
+			if d.cfg.Chroot != "" {
+				checkDirs := func(list ...string) (err error) {
+					var dirs []string
+					if _, _, dirs, err = vms.ResolvePath(d.cfg.Chroot, list...); err != nil {
+						return
+					}
+
+					for _, dir := range dirs {
+						err = os.MkdirAll(dir, 0777)
+						slog.Log(ctx, lod.ErrDebug(err), "create dir", "path", dir, "err", err)
+						if err != nil {
+							return
+						}
+						if d.cfg.Uid != 0 {
+							if err = cmd.Chown(ctx, dir, d.cfg.Uid, d.cfg.Gid); err != nil {
+								return
+							}
+						}
+					}
+					return
+				}
+
+				if err = checkDirs(d.cfg.DirData); err != nil {
+					return
+				}
+
+				if err = checkDirs(d.cfg.DirDownload...); err != nil {
+					return
+				}
+			}
+			return
+		},
 	}
 
 	return vm.Run(ctx)
 }
 
-func (d *Daemon) checkEnv(ctx context.Context) (spk_ver string, err error) {
-	var repairNeed bool
-
-	if spk_ver = iofs.Cat(PAN_XUNLEI_VER); spk_ver == "" {
-		slog.InfoContext(ctx, "can't find package version, repair it")
-		repairNeed = true
-	}
-
-	if !repairNeed && !iofs.IsExecutable(PAN_XUNLEI_CLI) {
-		slog.InfoContext(ctx, "can't find xunlei-pan-cli-launcher, repair it")
-		repairNeed = true
-	}
-
-	if !repairNeed && !iofs.IsExecutable(PAN_XUNLEI_CGI) {
-		slog.InfoContext(ctx, "can't find pan-xunlei-com-cgi, repair it")
-		repairNeed = true
-	}
-
-	if !repairNeed && !iofs.IsExecutable(fmt.Sprintf(PAN_XUNLEI_BIN, spk_ver)) {
-		slog.InfoContext(ctx, "can't find xunlei-pan-cli, repair it", "version", spk_ver)
-		repairNeed = true
-	}
-
-	if repairNeed {
-		if err = spk.ExtractEmbedSpk(ctx, SYNOPKG_PKGDEST); err != nil {
-			return
-		}
-	}
-
-	if spk_ver = iofs.Cat(PAN_XUNLEI_VER); spk_ver == "" {
-		err = fmt.Errorf("can't find package version")
+// 启动
+func (d *Daemon) directRun(ctx context.Context) (err error) {
+	if err = spk.ExtractEmbedSpk(ctx, SYNOPKG_PKGDEST); err != nil {
 		return
 	}
 
-	return
-}
-
-// 启动
-func (d *Daemon) directRun(ctx context.Context) (err error) {
-	var spk_ver string
-	if spk_ver, err = d.checkEnv(ctx); err != nil {
+	var spkVer string
+	if spkVer = iofs.Cat(PAN_XUNLEI_VER); spkVer == "" {
+		err = fmt.Errorf("can't find package version")
 		return
 	}
 
@@ -164,15 +171,15 @@ func (d *Daemon) directRun(ctx context.Context) (err error) {
 	slog.InfoContext(ctx, ` \/  |  | |\ | |    |___  |`)
 	slog.InfoContext(ctx, `_/\_ |__| | \| |___ |___  |`)
 	slog.InfoContext(ctx, fmt.Sprintf(`%s %s`, "daemon version:", d.ver))
-	slog.InfoContext(ctx, fmt.Sprintf(`%s %s`, "spk version:", spk_ver))
+	slog.InfoContext(ctx, fmt.Sprintf(`%s %s`, "spk version:", spkVer))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %d", "port:", d.cfg.Port))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "ip:", d.cfg.Ip))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "dashboard username:", d.cfg.DashboardUsername))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "dashboard password:", d.cfg.DashboardPassword))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "dir download:", d.cfg.DirDownload))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "dir data:", d.cfg.DirData))
-	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "uid:", d.cfg.Uid))
-	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "gid:", d.cfg.Gid))
+	slog.InfoContext(ctx, fmt.Sprintf("%s %d", "uid:", d.cfg.Uid))
+	slog.InfoContext(ctx, fmt.Sprintf("%s %d", "gid:", d.cfg.Gid))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %t", "prevent update:", d.cfg.PreventUpdate))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %s", "chroot:", d.cfg.Chroot))
 	slog.InfoContext(ctx, fmt.Sprintf("%s %t", "debug:", d.cfg.Debug))
@@ -183,10 +190,20 @@ func (d *Daemon) directRun(ctx context.Context) (err error) {
 		return
 	}
 
+	var downloads []string
+	if downloads, _, _, err = vms.ResolvePath(d.cfg.Chroot, d.cfg.DirDownload...); err != nil {
+		return
+	}
+
+	var dirData []string
+	if dirData, _, _, err = vms.ResolvePath(d.cfg.Chroot, d.cfg.DirData); err != nil {
+		return
+	}
+
 	env := cmd.EnvSet(os.Environ()).Clean().
 		Set("SYNOPLATFORM", SYNO_PLATFORM).
 		Set("SYNOPKG_PKGNAME", SYNOPKG_PKGNAME).
-		Set("SYNOPKG_PKGVER", spk_ver).
+		Set("SYNOPKG_PKGVER", spkVer).
 		Set("SYNOPKG_PKGDEST", SYNOPKG_PKGDEST).
 		Set("SYNOPKG_DSM_VERSION_MAJOR", SYNOPKG_DSM_VERSION_MAJOR).
 		Set("SYNOPKG_DSM_VERSION_MINOR", SYNOPKG_DSM_VERSION_MINOR).
@@ -194,9 +211,9 @@ func (d *Daemon) directRun(ctx context.Context) (err error) {
 		Set("DriveListen", "unix://"+DRIVE_LISTEN_PATH).
 		Set("PLATFORM", "群晖").
 		Set("OS_VERSION", OS_VERSION).
-		Set("ConfigPath", d.cfg.DirData).
-		Set("HOME", filepath.Join(d.cfg.DirData, ".drive")).
-		Set("DownloadPATH", d.cfg.DirDownload.String()).
+		Set("ConfigPath", dirData[0]).
+		Set("HOME", filepath.Join(dirData[0], ".drive")).
+		Set("DownloadPATH", strings.Join(downloads, string(filepath.ListSeparator))).
 		Set("TLSInsecureSkipVerify", "true").
 		Set("GIN_MODE", "release")
 
@@ -232,20 +249,20 @@ func (d *Daemon) mockCgi(ctx context.Context, environs []string) (port uint16, e
 		})
 	})
 
-	wcgi := log.MessageRecive(log.Prefix(ctx, "xunlei-pan-cgi"), handleXlLog())
+	wCgi := log.MessageReceive(log.Prefix(ctx, "xunlei-pan-cgi"), handleXlLog())
 
 	mux.Group(func(r web.Router) {
 		web.UseBasicAuth(r, d.cfg.DashboardUsername, d.cfg.DashboardPassword)
 
-		hcgi := &cgi.Handler{
+		hGgi := &cgi.Handler{
 			Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
 			Env:    environs,
-			Stderr: wcgi,
-			Logger: log.LogStd(wcgi, "cgi"),
+			Stderr: wCgi,
+			Logger: log.Std(wCgi, "cgi"),
 		}
 
 		indexPattern := fmt.Sprintf("/webman/3rdparty/%s/index.cgi/", SYNOPKG_PKGNAME)
-		r.Handle(indexPattern+"*", hcgi)
+		r.Handle(indexPattern+"*", hGgi)
 		r.Handle("GET /", web.Redirect(indexPattern, true))
 		r.Handle("GET /web", web.Redirect(indexPattern, true))
 		r.Handle("GET /webman", web.Redirect(indexPattern, true))
@@ -260,14 +277,14 @@ func (d *Daemon) mockCgi(ctx context.Context, environs []string) (port uint16, e
 		Handler: mux,
 		Addr:    net.JoinHostPort(ip, strconv.FormatUint(uint64(d.cfg.Port), 10)),
 		OnShutDown: func(ctx context.Context) {
-			if err := wcgi.Close(); err != nil {
+			if err := wCgi.Close(); err != nil {
 				slog.WarnContext(ctx, "close wcgi", "err", err)
 			}
 		},
 	})
 }
 
-func handleXlLog() func(ctx context.Context, s string) {
+func handleXlLog1() func(ctx context.Context, s string) {
 	var last slog.Level
 	locker := sync.Mutex{}
 
@@ -288,7 +305,7 @@ func handleXlLog() func(ctx context.Context, s string) {
 					switch k {
 					case "time":
 						if t, err := time.Parse(time.RFC3339, v); err != nil {
-							attrs = append(attrs, slog.String("parsetime", err.Error()))
+							attrs = append(attrs, slog.String("parse_time", err.Error()))
 						} else {
 							attrs = append(attrs, slog.Time(slog.TimeKey, t))
 						}
@@ -297,11 +314,18 @@ func handleXlLog() func(ctx context.Context, s string) {
 							msg = v
 						}
 					case "level":
-						l = log.LevelFromString(v)
+						l = log.LevelFromString(v, slog.LevelDebug)
 					default:
 						attrs = append(attrs, slog.String(k, v))
 					}
 				}
+			}
+
+			if l == slog.LevelError &&
+				(strings.HasPrefix(msg, "loadHistory") ||
+					strings.HasPrefix(msg, "KillDrivePid") ||
+					strings.HasPrefix(msg, "agent/agent.go")) {
+				l = slog.LevelDebug
 			}
 
 			slog.LogAttrs(ctx, l, msg, attrs...)
@@ -334,7 +358,7 @@ func handleXlLog() func(ctx context.Context, s string) {
 
 		t, err := time.ParseInLocation("2006/01/02 15:04:05", strconv.Itoa(time.Now().Year())+"/"+s[:14], time.Local)
 		if err != nil {
-			attrs = append(attrs, slog.String("parsetime", err.Error()))
+			attrs = append(attrs, slog.String("parse_time", err.Error()))
 		} else {
 			attrs = append(attrs, slog.Time(slog.TimeKey, t))
 		}
@@ -345,5 +369,71 @@ func handleXlLog() func(ctx context.Context, s string) {
 		}
 
 		slog.LogAttrs(ctx, l, msg, attrs...)
+	}
+}
+
+var _ = handleXlLog1
+
+func handleXlLog() func(ctx context.Context, s string) {
+	var lFlags = []string{"INFO", "WARNING", "ERROR"}
+
+	re := regexp.MustCompile(`^([\w-.]+/)?([\w-.]+)\.go:(\d+)\s`)
+
+	l := slog.LevelDebug
+
+	handleXl := func(ctx context.Context, s string) (handled bool) {
+		var (
+			msg   string
+			attrs []slog.Attr
+		)
+
+		for _, it := range lFlags {
+			if i := strings.Index(s, it); i == 18 || i == 36 {
+				l = log.LevelFromString(it, slog.LevelInfo) - 4
+				msg = strings.TrimSpace(s[i+len(it):])
+
+				if i == 36 {
+					t, e := time.Parse(time.RFC3339Nano, s[:35])
+					if e != nil {
+						attrs = append(attrs, slog.String("source_time", s[:35]))
+						attrs = append(attrs, slog.String("parse_time", e.Error()))
+					} else {
+						attrs = append(attrs, slog.Time(slog.TimeKey, t))
+					}
+					attrs = append(attrs, slog.Any(slog.SourceKey, &slog.Source{}))
+				} else {
+					st := strconv.Itoa(time.Now().Year()) + "/" + s[:14]
+					t, e := time.ParseInLocation("2006/01/02 15:04:05", st, time.Local)
+					if e != nil {
+						attrs = append(attrs, slog.String("source_time", s[:35]))
+						attrs = append(attrs, slog.String("parse_time", e.Error()))
+					} else {
+						attrs = append(attrs, slog.Time(slog.TimeKey, t))
+					}
+					attrs = append(attrs, slog.Time(slog.TimeKey, t))
+					if matches := re.FindStringSubmatch(msg); len(matches) == 4 {
+						attrs = append(attrs, slog.Any(slog.SourceKey, &slog.Source{
+							File: matches[1] + matches[2] + ".go",
+							Line: lod.May(strconv.Atoi(matches[3])),
+						}))
+						msg = strings.TrimSpace(msg[len(matches[0]):])
+					} else {
+						attrs = append(attrs, slog.Any(slog.SourceKey, &slog.Source{}))
+					}
+				}
+
+				slog.LogAttrs(ctx, l, msg, attrs...)
+				handled = true
+				return
+			}
+		}
+		return
+	}
+
+	return func(ctx context.Context, s string) {
+		if handleXl(ctx, s) {
+			return
+		}
+		slog.LogAttrs(ctx, l, s, slog.Any(slog.SourceKey, &slog.Source{}))
 	}
 }

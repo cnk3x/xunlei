@@ -138,21 +138,27 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 
 	rep := h.replaceAttr
 
+	var src *slog.Source
+
 	r.Attrs(func(attr slog.Attr) bool {
 		if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
 			r.Time = attr.Value.Time()
-			return false
 		}
+
+		if attr.Key == slog.SourceKey && attr.Value.Kind() == slog.KindAny {
+			src, _ = attr.Value.Any().(*slog.Source)
+		}
+
 		return true
 	})
 
 	// write time
 	if !r.Time.IsZero() {
-		val := r.Time.Round(0) // strip monotonic to match Attr behavior
+		val := r.Time.Round(0)
 		if rep == nil {
 			h.appendTime(buf, r.Time)
 			buf.WriteByte(' ')
-		} else if a := rep(nil /* groups */, slog.Time(slog.TimeKey, val)); a.Key != "" {
+		} else if a := rep(nil, slog.Time(slog.TimeKey, val)); a.Key != "" {
 			if a.Value.Kind() == slog.KindTime {
 				h.appendTime(buf, a.Value.Time())
 			} else {
@@ -166,26 +172,28 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	if rep == nil {
 		h.appendLevel(buf, r.Level)
 		buf.WriteByte(' ')
-	} else if a := rep(nil /* groups */, slog.Any(slog.LevelKey, r.Level)); a.Key != "" {
+	} else if a := rep(nil, slog.Any(slog.LevelKey, r.Level)); a.Key != "" {
 		h.appendValue(buf, a.Value, false)
 		buf.WriteByte(' ')
 	}
 
 	// write source
 	if h.addSource {
-		fs := runtime.CallersFrames([]uintptr{r.PC})
-		f, _ := fs.Next()
-		if f.File != "" {
-			src := &slog.Source{
-				Function: f.Function,
-				File:     f.File,
-				Line:     f.Line,
+		if src == nil {
+			if f, _ := runtime.CallersFrames([]uintptr{r.PC}).Next(); f.File != "" {
+				src = &slog.Source{
+					Function: f.Function,
+					File:     f.File,
+					Line:     f.Line,
+				}
 			}
+		}
 
+		if src != nil {
 			if rep == nil {
 				h.appendSource(buf, src)
 				buf.WriteByte(' ')
-			} else if a := rep(nil /* groups */, slog.Any(slog.SourceKey, src)); a.Key != "" {
+			} else if a := rep(nil, slog.Any(slog.SourceKey, src)); a.Key != "" {
 				h.appendValue(buf, a.Value, false)
 				buf.WriteByte(' ')
 			}
@@ -215,10 +223,16 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 
 	// write attributes
 	r.Attrs(func(attr slog.Attr) bool {
-		if attr.Key != slog.TimeKey || attr.Value.Kind() != slog.KindTime {
-			if attr.Value.Any() != nil {
-				h.appendAttr(buf, attr, h.groupPrefix, h.groups)
-			}
+		if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
+			return true
+		}
+
+		if attr.Key == slog.SourceKey && attr.Value.Kind() == slog.KindAny {
+			return true
+		}
+
+		if attr.Value.Any() != nil {
+			h.appendAttr(buf, attr, h.groupPrefix, h.groups)
 		}
 		return true
 	})
@@ -301,28 +315,34 @@ func appendLevelDelta(buf *buffer, delta slog.Level) {
 }
 
 func (h *handler) appendSource(buf *buffer, src *slog.Source) {
-	dir, file := filepath.Split(src.File)
-	dir = filepath.Base(dir)
-
-	const max = 15
-
-	filename := filepath.Join(filepath.Base(dir), file)
-	if l := len(filename); l > max {
-		filename = leftPad(file, max)
-	} else if l < max {
-		filename = leftPad(filename, max)
-	}
+	const maxL = 15
 
 	buf.WriteStringIf(!h.noColor, ansiFaint)
-	buf.WriteString(filename)
-	buf.WriteByte(':')
-	buf.WriteString(rightPad(strconv.Itoa(src.Line), 3))
+	if src.File != "" {
+		dir, file := filepath.Split(src.File)
+		dir = filepath.Base(dir)
+		filename := filepath.Join(filepath.Base(dir), file)
+		if l := len(filename); l > maxL {
+			filename = leftPad(file, maxL)
+		} else if l < maxL {
+			filename = leftPad(filename, maxL)
+		}
+		buf.WriteString(filename)
+		buf.WriteByte(':')
+		buf.WriteString(rightPad(strconv.Itoa(src.Line), 3))
+	} else {
+		buf.WriteString(leftPad("--    ", maxL+4))
+	}
 	buf.WriteStringIf(!h.noColor, ansiReset)
 }
 
 func leftPad(s string, w int) string {
 	if l := len(s); l > w {
-		s = s[:w]
+		if w > 2 {
+			s = ".." + s[l-w+2:]
+		} else {
+			s = s[l-w:]
+		}
 	} else {
 		s = strings.Repeat(" ", w-l) + s
 	}
@@ -405,6 +425,7 @@ func (h *handler) appendValue(buf *buffer, v slog.Value, quote bool) {
 		default:
 			appendString(buf, fmt.Sprintf("%+v", v.Any()), quote)
 		}
+	default:
 	}
 }
 

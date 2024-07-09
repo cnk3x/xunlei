@@ -16,12 +16,12 @@ import (
 	"github.com/cnk3x/xunlei/pkg/lod"
 )
 
-// cat 以utf8编码读取文件文本内容
+// Cat 以utf8编码读取文件文本内容
 func Cat(path string) string {
 	return string(ReadFile(path))
 }
 
-// fileWrite 写入文件
+// WriteText 写入文件
 func WriteText[T ~string | ~[]byte](ctx context.Context, path string, data T, perm os.FileMode, overwrite ...bool) (err error) {
 	if _, err = Mkdir(filepath.Dir(path), 0777); err != nil {
 		return
@@ -29,7 +29,7 @@ func WriteText[T ~string | ~[]byte](ctx context.Context, path string, data T, pe
 
 	err = func() (err error) {
 		var f *os.File
-		if lod.Selects(overwrite) {
+		if lod.First(overwrite) {
 			f, err = os.Create(path)
 		} else {
 			f, err = os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
@@ -57,7 +57,7 @@ func WriteText[T ~string | ~[]byte](ctx context.Context, path string, data T, pe
 		return
 	}()
 
-	slog.Log(ctx, lod.ErrDebug(err), "write", "path", path, "data", string(data), "err", err)
+	slog.Log(ctx, lod.ErrDebug(err), "write", "perm", perm, "path", path, "data", string(data), "err", err)
 	return
 }
 
@@ -105,7 +105,7 @@ func CopyFile(srcPath, dstPath string, overwrite ...bool) (ok bool, err error) {
 	return
 }
 
-// 读取软链接信息
+// Readlink 读取软链接信息
 func Readlink(linkname string) (dir, name string, err error) {
 	if name, err = os.Readlink(linkname); !filepath.IsAbs(name) {
 		dir = filepath.Dir(linkname)
@@ -113,7 +113,7 @@ func Readlink(linkname string) (dir, name string, err error) {
 	return
 }
 
-// 创建文件系统软链接
+// Symlink 创建文件系统软链接
 //
 //	如果目标是软链接，删除
 //	如果目标是目录，判断是否为空，为空则删除
@@ -159,7 +159,7 @@ func Symlink(ctx context.Context, oldname, newname string, overwrite ...bool) (e
 	return os.Symlink(oldname, newname)
 }
 
-// 创建文件夹
+// Mkdir 创建文件夹
 //
 //	如果文件夹存在，跳过
 //	如果目标是软链接，删除，再创建文件夹
@@ -192,7 +192,7 @@ func Mkdir(dir string, perm os.FileMode) (ok bool, err error) {
 	return
 }
 
-// 判断路径是否是文件
+// IsFile 判断路径是否是文件
 func IsFile(path string) bool {
 	f, err := os.Stat(path)
 	return err == nil && f.Mode().IsRegular()
@@ -200,16 +200,16 @@ func IsFile(path string) bool {
 
 const ModeExecutable fs.FileMode = 0o111
 
-// 判断路径是否可执行
+// IsExecutable 判断路径是否可执行
 func IsExecutable(path string) bool {
 	f, err := os.Stat(path)
-	return err == nil && f.Mode().IsRegular() && f.Mode().Perm()&ModeExecutable != 0
+	return err == nil && f.Mode().Perm()&ModeExecutable != 0
 }
 
-// 判断目录是否为空目录或者仅包含空目录的目录
+// DirIsEmpty 判断目录是否为空目录或者仅包含空目录的目录
 func DirIsEmpty(dir string, ignore ...string) (empty bool) {
 	dir, _ = filepath.Abs(dir)
-	filepath.WalkDir(dir, func(path string, d fs.DirEntry, e error) error {
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, e error) error {
 		if e == nil && (!d.IsDir() || slices.Contains(ignore, path)) {
 			empty = true
 			e = fs.SkipAll
@@ -221,10 +221,10 @@ func DirIsEmpty(dir string, ignore ...string) (empty bool) {
 
 var B32 = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
 
-// randText 生成一个指定长度的随机字符串。
+// RandText 生成一个指定长度的随机字符串。
 func RandText(n int) (s string) {
 	var d = make([]byte, (n+4)/8*5)
-	rand.Read(d)
+	_, _ = rand.Read(d)
 	if s = B32.EncodeToString(d); len(s) > n {
 		s = s[:n]
 	}

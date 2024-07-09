@@ -30,13 +30,10 @@ type ForkOptions struct {
 
 func Fork(ctx context.Context, fOpts ForkOptions) (err error) {
 	cmd := exec.CommandContext(ctx, os.Args[0], fOpts.Args...)
+	SetupProcAttr(cmd, syscall.SIGINT, fOpts.Uid, fOpts.Gid)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = fOpts.Env.Set(keyTag, fOpts.Tag)
-
-	Setpgid(ctx, cmd)
-	SetPdeathsig(ctx, cmd, syscall.SIGINT)
-	SetCredential(ctx, cmd, fOpts.Uid, fOpts.Gid)
 
 	slog.DebugContext(ctx, fOpts.Tag+" run", "command", cmd.String(), "uid", fOpts.Uid, "gid", fOpts.Gid)
 	if err = cmd.Start(); err != nil {

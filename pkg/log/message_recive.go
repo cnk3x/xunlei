@@ -7,8 +7,8 @@ import (
 	"log"
 )
 
-func MessageRecive(ctx context.Context, handleMessage func(ctx context.Context, msg string)) io.WriteCloser {
-	lw := &reciver{}
+func MessageReceive(ctx context.Context, handleMessage func(ctx context.Context, msg string)) io.WriteCloser {
+	lw := &receiver{}
 	lw.ctx, lw.cancel = context.WithCancel(ctx)
 	lw.pr, lw.pw = io.Pipe()
 	lw.done = make(chan struct{})
@@ -30,7 +30,7 @@ func MessageRecive(ctx context.Context, handleMessage func(ctx context.Context, 
 	return lw
 }
 
-type reciver struct {
+type receiver struct {
 	pr            io.ReadCloser
 	pw            io.WriteCloser
 	ctx           context.Context
@@ -39,7 +39,7 @@ type reciver struct {
 	done          chan struct{}
 }
 
-func (lw *reciver) Scan() {
+func (lw *receiver) Scan() {
 	for br := bufio.NewScanner(lw.pr); br.Scan(); {
 		select {
 		case <-lw.ctx.Done():
@@ -50,14 +50,14 @@ func (lw *reciver) Scan() {
 	}
 }
 
-func (lw *reciver) Write(p []byte) (n int, err error) {
+func (lw *receiver) Write(p []byte) (n int, err error) {
 	if n, err = lw.pw.Write(p); err != nil {
 		lw.cancel()
 	}
 	return
 }
 
-func (lw *reciver) Close() (err error) {
+func (lw *receiver) Close() (err error) {
 	if lw.cancel != nil {
 		lw.cancel()
 	}
@@ -65,4 +65,4 @@ func (lw *reciver) Close() (err error) {
 	return
 }
 
-func LogStd(w io.Writer, prefix string) *log.Logger { return log.New(w, prefix, 0) }
+func Std(w io.Writer, prefix string) *log.Logger { return log.New(w, prefix, 0) }

@@ -40,7 +40,7 @@ wsl::
 	GOARCH=amd64 $(GO_BUILD) -v -o /usr/local/bin/xlp ./cmd/xlp
 
 home:: amd64
-	docker buildx build --push -t $(shell cat home.repo)/xunlei:latest -t $(shell cat home.repo)/xunlei:$(VERSION) -f docker/Dockerfile .
+	docker buildx build --push -t $(shell cat home.repo)/xunlei:$(VERSION) -f docker/Dockerfile .
 
 hello::
 	echo $(HELLO) $(VERSION)

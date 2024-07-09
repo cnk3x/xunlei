@@ -104,10 +104,10 @@ func rFormatIp(in net.IP) (s string) {
 
 type PathList []string
 
-func (in PathList) Compact() (n PathList) {
+func (in PathList) Compact() (out PathList) {
 	for _, p := range in {
-		if p != "" && !slices.Contains(n, p) {
-			n = append(n, p)
+		if p != "" && !slices.Contains(out, p) {
+			out = append(out, p)
 		}
 	}
 	return
@@ -117,11 +117,11 @@ func (in PathList) String() string {
 	return strings.Join(in.Compact(), string(filepath.ListSeparator))
 }
 
-func (in PathList) Abs() (n PathList) {
+func (in PathList) Abs() (out PathList) {
 	for _, p := range in {
 		if p != "" {
-			if p, e := filepath.Abs(p); e == nil && !slices.Contains(n, p) {
-				n = append(n, p)
+			if p, e := filepath.Abs(p); e == nil && !slices.Contains(out, p) {
+				out = append(out, p)
 			}
 		}
 	}

@@ -11,21 +11,22 @@ import (
 // EnvSet 环境变量集合，封装了一些对环境变量集合的操作
 type EnvSet []string
 
-// 判断是否已经包含某个键
+// Has 判断是否已经包含某个键
 func (src EnvSet) Has(k string) bool { return slices.ContainsFunc(src, findPrefix(k+"=")) }
 
-// 设置环境变量，如果已经存在则先删除再追加
-func (src EnvSet) Set(k, v string) EnvSet {
+// Set 设置环境变量，如果已经存在则先删除再追加
+func (src EnvSet) Set(k, v string) (out EnvSet) {
+	out = src
 	if k = strings.TrimSpace(k); k != "" {
-		src = append(src.Unset(k), k+"="+v)
+		out = append(out.Unset(k), k+"="+v)
 	}
-	return src
+	return out
 }
 
-// 删除环境变量
+// Unset 删除环境变量
 func (src EnvSet) Unset(k string) EnvSet { return slices.DeleteFunc(src, findPrefix(k+"=")) }
 
-// 清理无效的环境变量，重复的保留最后一个
+// Clean 清理无效的环境变量，重复的保留最后一个
 func (src EnvSet) Clean() EnvSet {
 	var j = len(src)
 	for i := len(src) - 1; i >= 0; i-- {

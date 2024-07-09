@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"github.com/cnk3x/xunlei/pkg/cmd"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,7 +13,6 @@ import (
 	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/lod"
 	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/cmd"
 )
 
 var version = "unknown"

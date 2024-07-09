@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -16,12 +17,12 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
-// 从迅雷SPK中提取需要的文件
+// ExtractEmbedSpk 从迅雷SPK中提取需要的文件
 func ExtractEmbedSpk(ctx context.Context, dstDir string) error {
 	return ExtractSpk(ctx, bytes.NewReader(Bytes), dstDir)
 }
 
-// 从迅雷SPK中提取需要的文件
+// ExtractSpkFile 从迅雷SPK中提取需要的文件
 func ExtractSpkFile(ctx context.Context, srcPath string, dstDir string) error {
 	src, err := os.Open(srcPath)
 	if err != nil {
@@ -31,7 +32,7 @@ func ExtractSpkFile(ctx context.Context, srcPath string, dstDir string) error {
 	return ExtractSpk(ctx, src, dstDir)
 }
 
-// 从迅雷SPK中提取需要的文件
+// ExtractSpk 从迅雷SPK中提取需要的文件
 func ExtractSpk(ctx context.Context, src io.Reader, dstDir string) (err error) {
 	return TarExtract(ctx, src, func(ctx context.Context, tr io.Reader, h *tar.Header) (err error) {
 		if h.Name == "package.tgz" {
@@ -44,7 +45,7 @@ func ExtractSpk(ctx context.Context, src io.Reader, dstDir string) (err error) {
 	})
 }
 
-// 从迅雷SPK文件内的package.tgz中提取需要的文件
+// ExtractSpkPackage 从迅雷SPK文件内的package.tgz中提取需要的文件
 func ExtractSpkPackage(ctx context.Context, src io.Reader, dstDir string) error {
 	return TarExtract(ctx, src, func(ctx context.Context, tr io.Reader, h *tar.Header) (err error) {
 		var perm fs.FileMode
@@ -61,7 +62,7 @@ func ExtractSpkPackage(ctx context.Context, src io.Reader, dstDir string) error 
 		}
 
 		err = iofs.WriteFileContext(ctx, tr, filepath.Join(dstDir, h.Name), perm)
-		slog.Log(ctx, lod.ErrDebug(err), "extract package", "perm", perm, "name", h.Name, "err", err)
+		slog.Log(ctx, lod.ErrDebug(err), "extract package", "perm", perm, "target_dir", dstDir, "name", h.Name, "err", err)
 		return
 	}, Xz)
 }
@@ -88,7 +89,7 @@ func TarExtract(ctx context.Context, src io.Reader, walk TarWalkFunc, decoder ..
 		err = walk.Read(ctx, tr, hdr)
 	}
 
-	if err == fs.SkipAll || err == io.EOF {
+	if errors.Is(err, fs.SkipAll) || err == io.EOF {
 		err = nil
 	}
 	return

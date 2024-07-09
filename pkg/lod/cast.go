@@ -26,7 +26,7 @@ func Itoa[T Number | ~bool](in T) string {
 	}
 }
 
-// Itoa converts a number or bool to string
+// Atoi converts a number or bool to string
 func Atoi[T Number](in string) (out T, err error) {
 	switch v := reflect.ValueOf(out); v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -47,18 +47,42 @@ func Atoi[T Number](in string) (out T, err error) {
 	return
 }
 
-type Int interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64
+func FormatInt[T Int | Uint](in T, base ...int) string {
+	return strconv.FormatInt(int64(in), First(base, 10))
 }
 
-type Uint interface {
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
+var (
+	ParseByte   = mkParseUint[byte](8)
+	ParseUint8  = mkParseUint[uint8](8)
+	ParseUint16 = mkParseUint[uint16](16)
+	ParseUint32 = mkParseUint[uint32](32)
+	ParseUint64 = mkParseUint[uint64](64)
+
+	ParseInt8  = mkParseInt[int8](8)
+	ParseInt16 = mkParseInt[int16](16)
+	ParseInt32 = mkParseInt[int32](32)
+	ParseInt64 = mkParseInt[int64](64)
+
+	ParseFloat32 = mkParseFloat[float32](32)
+	ParseFloat64 = mkParseFloat[float64](64)
+)
+
+func mkParseUint[T Uint](bits int) func(s string) (T, error) {
+	return func(s string) (T, error) {
+		return conv[uint64, T](strconv.ParseUint(s, 0, bits))
+	}
 }
 
-type Float interface {
-	~float32 | ~float64
+func mkParseInt[T Int](bits int) func(s string) (T, error) {
+	return func(s string) (T, error) {
+		return conv[int64, T](strconv.ParseInt(s, 0, bits))
+	}
 }
 
-type Number interface {
-	Int | Uint | Float
+func mkParseFloat[T Float](bits int) func(s string) (T, error) {
+	return func(s string) (T, error) {
+		return conv[float64, T](strconv.ParseFloat(s, bits))
+	}
 }
+
+func conv[I, O Number](in I, err error) (O, error) { return O(in), err }

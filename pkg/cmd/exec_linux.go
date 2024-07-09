@@ -3,12 +3,18 @@ package cmd
 import (
 	"context"
 	"errors"
+	"github.com/cnk3x/xunlei/pkg/lod"
 	"log/slog"
 	"os/exec"
 	"os/user"
-	"strconv"
 	"syscall"
 )
+
+func SetupProcAttr(c *exec.Cmd, pdeathsig syscall.Signal, uid, gid uint32) {
+	Setpgid(c)
+	SetPdeathsig(c, pdeathsig)
+	SetCredential(c, uid, gid)
+}
 
 func IsSignaled(err error) bool {
 	var ee *exec.ExitError
@@ -20,14 +26,12 @@ func IsSignaled(err error) bool {
 	return false
 }
 
-func SetCredential(ctx context.Context, c *exec.Cmd, uid, gid uint32) {
-	idEq := func(id1 string, id2 uint32) bool { return id1 == strconv.FormatUint(uint64(id2), 10) }
-	if u, _ := user.Current(); u != nil && idEq(u.Uid, uid) && idEq(u.Gid, gid) {
+func SetCredential(c *exec.Cmd, uid, gid uint32) {
+	if uid != 0 && gid != 0 { //必须有root权限才能设置
 		if c.SysProcAttr == nil {
 			c.SysProcAttr = &syscall.SysProcAttr{}
 		}
 		c.SysProcAttr.Credential = &syscall.Credential{Uid: uid, Gid: gid, NoSetGroups: true}
-		slog.DebugContext(ctx, "SetCredential", "uid", uid, "gid", gid)
 	}
 }
 
@@ -39,76 +43,91 @@ func SetNewNS(ctx context.Context, c *exec.Cmd) {
 	slog.DebugContext(ctx, "SetNewNS")
 }
 
-func SetPdeathsig(ctx context.Context, c *exec.Cmd, sig syscall.Signal) {
+func SetPdeathsig(c *exec.Cmd, sig syscall.Signal) {
 	if sig != 0 {
 		if c.SysProcAttr == nil {
 			c.SysProcAttr = &syscall.SysProcAttr{}
 		}
 		c.SysProcAttr.Pdeathsig = sig
-		slog.DebugContext(ctx, "SetPdeathsig", "signal", sig)
+		//slog.DebugContext(ctx, "SetPdeathsig", "signal", sig)
 	}
 }
 
-func Setpgid(ctx context.Context, c *exec.Cmd) {
+func Setpgid(c *exec.Cmd) {
 	if c.SysProcAttr == nil {
 		c.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	c.SysProcAttr.Setpgid = true
-	slog.DebugContext(ctx, "Setpgid")
+	//slog.DebugContext(ctx, "Setpgid")
 }
 
-func UserFind(userOrId, groupOrId string) (uid, gid uint32, err error) {
-	var u *user.User
-	var g *user.Group
+func isStrZero(s string) bool { return len(s) == 0 || s == "0" }
 
-	parseUint := func(s string) (uint32, error) {
-		if out, err := strconv.ParseUint(s, 10, 32); err != nil {
-			return 0, err
-		} else {
-			return uint32(out), nil
-		}
+func User(userNameOrId, groupNameOrId string) (uid, gid uint32, err error) {
+	if isStrZero(userNameOrId) && isStrZero(groupNameOrId) {
+		return
 	}
 
-	if userOrId != "" {
-		u, err = user.Lookup(userOrId)
-
-		if err != nil {
-			u, err = user.LookupId(userOrId)
-		}
-
-		if err != nil {
-			uid, err = parseUint(userOrId)
-		}
-
-		if err != nil {
-			return
-		}
+	u, ue := ParseUserId(userNameOrId)
+	if ue != nil {
+		err = ue
+		return
 	}
 
-	if groupOrId != "" {
-		g, err = user.LookupGroup(groupOrId)
-
-		if err != nil {
-			g, err = user.LookupGroupId(groupOrId)
-		}
-
-		if err != nil {
-			gid, err = parseUint(groupOrId)
-		}
-
-		if err != nil {
-			return
-		}
+	if g, ge := ParseGroupId(groupNameOrId); g != nil && ge == nil {
+		u.Gid = g.Gid
 	}
 
-	if u != nil {
-		uid, _ = parseUint(u.Uid)
-		gid, _ = parseUint(u.Gid)
+	uid = lod.May(lod.ParseUint32(u.Uid))
+	gid = lod.May(lod.ParseUint32(u.Gid))
+	return
+}
+
+func ParseUserId(nameOrId string) (u *user.User, err error) {
+	if nameOrId == "" {
+		nameOrId = "0"
 	}
 
-	if g != nil {
-		gid, _ = parseUint(g.Gid)
+	if u, err = user.Current(); err == nil && u != nil && (u.Username == nameOrId || u.Uid == nameOrId) {
+		return
 	}
 
+	if u, err = user.Lookup(nameOrId); err == nil {
+		return
+	}
+
+	if u, err = user.LookupId(nameOrId); err == nil {
+		return
+	}
+
+	uid, e := lod.ParseUint32(nameOrId)
+	if e != nil {
+		return nil, e
+	}
+
+	u = &user.User{Uid: lod.FormatInt(uid)}
+	return
+}
+
+func ParseGroupId(nameOrId string) (g *user.Group, err error) {
+	if nameOrId == "" {
+		nameOrId = "0"
+	}
+
+	if g, err = user.LookupGroup(nameOrId); err == nil {
+		return
+	}
+
+	if g, err = user.LookupGroupId(nameOrId); err == nil {
+		return
+	}
+
+	gid, e := lod.ParseUint32(nameOrId)
+	if e != nil {
+		err = e
+		return
+	}
+
+	g = &user.Group{Gid: lod.FormatInt(gid)}
 	return
 }

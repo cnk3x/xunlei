@@ -1,22 +1,17 @@
 package lod
 
-// Iif 三元运算
-func Iif[T any](cond bool, t, f T) T {
-	if cond {
-		return t
-	}
-	return f
-}
-
-// Iif 三元运算
-func IifF[T any](cond bool, t, f func() T) T { return Iif(cond, t, f)() }
-
-// 选择第一个不为零值的值
+// Select 选择第一个不为零值的值
 func Select[T comparable](vs ...T) (out T) { return Selects(vs) }
 
-// 选择第一个不为零值的值
-func Selects[T comparable](vs []T) (out T) {
+// Selects 选择第一个不为零值的值
+func Selects[T comparable](vs []T, fallback ...T) (out T) {
 	for _, v := range vs {
+		if v != out {
+			return v
+		}
+	}
+
+	for _, v := range fallback {
 		if v != out {
 			return v
 		}
@@ -24,23 +19,35 @@ func Selects[T comparable](vs []T) (out T) {
 	return
 }
 
-func First[T any](vs []T) (out T) {
+// First 返回第一个值
+func First[T any](vs []T, fallback ...T) (out T) {
 	if len(vs) > 0 {
-		out = vs[0]
+		return vs[0]
+	}
+	if len(fallback) > 0 {
+		return fallback[0]
 	}
 	return
 }
 
-func Last[T any](vs []T) (out T) {
+// Last 返回最后一个值
+func Last[T any](vs []T, fallback ...T) (out T) {
 	if l := len(vs); l > 0 {
-		out = vs[l-1]
+		return vs[l-1]
+	}
+	if len(fallback) > 0 {
+		return fallback[0]
 	}
 	return
 }
 
-func At[T any](vs []T, i int) (out T) {
+// At 返回指定索引的值
+func At[T any](vs []T, i int, fallback ...T) (out T) {
 	if 0 <= i && i < len(vs) {
-		out = vs[i]
+		return vs[i]
+	}
+	if len(fallback) > 0 {
+		return fallback[0]
 	}
 	return
 }
