@@ -1,13 +1,17 @@
+//go:build linux
+// +build linux
+
 package cmd
 
 import (
 	"context"
 	"errors"
-	"github.com/cnk3x/xunlei/pkg/lod"
 	"log/slog"
 	"os/exec"
 	"os/user"
 	"syscall"
+
+	"github.com/cnk3x/xunlei/pkg/lod"
 )
 
 func SetupProcAttr(c *exec.Cmd, pdeathsig syscall.Signal, uid, gid uint32) {

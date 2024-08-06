@@ -29,7 +29,6 @@ import (
 	"github.com/cnk3x/xunlei/spk"
 )
 
-//goland:noinspection GoSnakeCaseUsage
 const (
 	SYNOPKG_DSM_VERSION_MAJOR = "7"     //系统的主版本
 	SYNOPKG_DSM_VERSION_MINOR = "2"     //系统的次版本
@@ -53,7 +52,6 @@ const (
 	UPDATE_URL                 = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/version"
 )
 
-//goland:noinspection GoSnakeCaseUsage
 var (
 	SYNO_PLATFORM = lod.Iif(runtime.GOARCH == "amd64", "geminilake", "rtd1296")                                                             //平台
 	SYNO_MODEL    = lod.Iif(runtime.GOARCH == "amd64", "DS920+", "DS220j")                                                                  //平台
