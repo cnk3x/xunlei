@@ -4,12 +4,12 @@ package main
 
 import (
 	"context"
-	"github.com/cnk3x/xunlei/pkg/cmd"
 	"log/slog"
 	"os"
 	"os/signal"
 
 	"github.com/cnk3x/xunlei"
+	"github.com/cnk3x/xunlei/pkg/cmd"
 	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/lod"
 	"github.com/cnk3x/xunlei/pkg/log"
