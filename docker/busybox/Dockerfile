@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM ubuntu:focal as buildTemp
+FROM --platform=$BUILDPLATFORM ubuntu:focal AS temp
 ARG TARGETARCH
 
 RUN [ "${TARGETARCH}" = "arm64" -o "${TARGETARCH}" = "amd64" ] && echo ok || exit 1
@@ -25,21 +25,22 @@ COPY bin/xlp-${TARGETARCH} /rootfs/bin/xlp
 # RUN upx /rootfs/bin/xlp >/dev/null
 
 # copy libs
-COPY spk/nasxunlei-x86_64.spk /spk/nasxunlei.spk
-RUN tar -v -x -O -f /spk/nasxunlei.spk package.tgz | tar -v -x -J -C /spk --wildcards 'bin/bin/xunlei-pan-cli*' 'ui/index.cgi' \
+COPY spk/nasxunlei-*.spk /spk/
+RUN tar -v -x -O -f /spk/nasxunlei-$(["${TARGETARCH}" = "arm64"] && echo "armv8" || echo "x86_64").spk package.tgz \
+  | tar -v -x -J -C /spk --wildcards 'bin/bin/xunlei-pan-cli*' 'ui/index.cgi' \
   && mkdir -p /rootfs/lib \
   && ldd /spk/bin/bin/* /spk/ui/* | grep '=>' | awk '{ cmd="cp -L "$3" /rootfs/lib/"$1; print cmd; system(cmd) }'
 
 # 中转，避免覆盖lib
-FROM busybox:1.36.1 as libs
+FROM busybox:1.36.1 AS libs
 
-COPY --from=buildTemp /rootfs/ /rootfs/
+COPY --from=temp /rootfs/ /rootfs/
 RUN cp -Lf /lib/* /rootfs/lib/
 
 FROM busybox:1.36.1
 
-LABEL org.opencontainers.image.authors "cnk3x"
-LABEL org.opencontainers.image.source https://github.com/cnk3x/xunlei
+LABEL org.opencontainers.image.authors=cnk3x
+LABEL org.opencontainers.image.source=https://github.com/cnk3x/xunlei
 
 COPY --from=libs /rootfs/ /
 
