@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/lod"
@@ -206,17 +205,24 @@ func IsExecutable(path string) bool {
 	return err == nil && f.Mode().Perm()&ModeExecutable != 0
 }
 
-// DirIsEmpty 判断目录是否为空目录或者仅包含空目录的目录
-func DirIsEmpty(dir string, ignore ...string) (empty bool) {
-	dir, _ = filepath.Abs(dir)
-	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, e error) error {
-		if e == nil && (!d.IsDir() || slices.Contains(ignore, path)) {
-			empty = true
-			e = fs.SkipAll
-		}
-		return e
-	})
-	return
+// IsEmptyDir 判断路径是目录且为空
+func IsEmptyDir(dir string) (empty bool) {
+	stat, err := os.Lstat(dir)
+	if err != nil {
+		return os.IsNotExist(err) //不存在，当成是空目录
+	}
+
+	if !stat.IsDir() {
+		return
+	}
+
+	d, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	_, err = d.ReadDir(1)
+	d.Close()
+	return err == io.EOF
 }
 
 var B32 = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)

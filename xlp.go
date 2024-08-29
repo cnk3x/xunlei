@@ -41,8 +41,6 @@ const (
 
 	PAN_XUNLEI_VER = SYNOPKG_PKGDEST + "/bin/bin/version"                                   //版本文件
 	PAN_XUNLEI_CLI = SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli-launcher." + runtime.GOARCH //启动器
-	//PAN_XUNLEI_BIN = SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli.%s." + runtime.GOARCH       //主程序
-	//PAN_XUNLEI_CGI = SYNOPKG_PKGDEST + "/ui/index.cgi"                                      //CGI文件
 
 	LAUNCHER_LISTEN_PATH = SYNOPKG_PKGDEST + "/var/pan-xunlei-com-launcher.sock" //启动器监听地址
 	DRIVE_LISTEN_PATH    = SYNOPKG_PKGDEST + "/var/pan-xunlei-com.sock"          //主程序监听地址

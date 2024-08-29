@@ -51,7 +51,7 @@ func MountedEndpoints(dirs ...string) (endpoints []string, err error) {
 		}
 	}
 
-	slices.SortFunc(endpoints, func(a, b string) int { return lod.Select(len(b)-len(a), strings.Compare(b, a)) })
+	slices.SortFunc(endpoints, func(a, b string) int { return lod.Select(len(b)-len(a), strings.Compare(a, b)) })
 
 	return
 }
@@ -145,8 +145,8 @@ func Unbind(ctx context.Context, root string, removeEmpty ...bool) (err error) {
 	}
 
 	for _, endpoint := range endpoints {
-		if iofs.DirIsEmpty(endpoint) {
-			e := os.RemoveAll(endpoint)
+		if iofs.IsEmptyDir(endpoint) {
+			e := os.Remove(endpoint)
 			slog.DebugContext(ctx, "unbind", "endpoint", endpoint, "root", root, "action", "remove dir", "err", e)
 		} else {
 			slog.DebugContext(ctx, "unbind", "endpoint", endpoint, "root", root)
