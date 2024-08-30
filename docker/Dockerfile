@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM ubuntu:focal as buildTemp
+FROM --platform=$BUILDPLATFORM ubuntu:focal AS temp
 ARG TARGETARCH
 
 RUN [ "${TARGETARCH}" = "arm64" -o "${TARGETARCH}" = "amd64" ] && echo ok || exit 1
@@ -33,10 +33,10 @@ COPY bin/xlp-${TARGETARCH} /rootfs/usr/bin/xlp
 
 FROM ubuntu:focal
 
-LABEL org.opencontainers.image.authors "cnk3x"
-LABEL org.opencontainers.image.source https://github.com/cnk3x/xunlei
+LABEL org.opencontainers.image.authors=cnk3x
+LABEL org.opencontainers.image.source=https://github.com/cnk3x/xunlei
 
-COPY --from=buildTemp /rootfs/ /
+COPY --from=temp /rootfs/ /
 
 ENV LANG=C.UTF-8 LANG=zh_CN.UTF-8 LANGUAGE=zh_CN.UTF-8 LC_ALL=C \
   XL_DEBUG=false \

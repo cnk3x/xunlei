@@ -7,6 +7,8 @@ GO_BUILD := CGO_ENABLED=0 GOOS=linux go build -v -ldflags '-s -w -X main.version
 
 DOCKER_BUILD := docker buildx build --push --platform linux/amd64,linux/arm64
 
+VERSION := $(GITTAG)
+
 showTag:
 	@echo $(GITTAG)
 
@@ -25,6 +27,9 @@ latest:: build
 
 versioned:: build
 	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) -f docker/Dockerfile .
+
+push:: build 
+	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:$(VERSION) -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:latest -f docker/Dockerfile .
 
 binary:: build
 	rm -f bin/xlp bin/xlp-amd64.tar.gz
