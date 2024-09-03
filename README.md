@@ -1,11 +1,15 @@
 # 迅雷远程下载服务(非官方)
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/cnk3x/xunlei.svg)](https://hub.docker.com/r/cnk3x/xunlei)
-[![Docker Version](https://img.shields.io/docker/v/cnk3x/xunlei)](https://hub.docker.com/r/cnk3x/xunlei)
-[![GitHub Stars](https://img.shields.io/github/stars/cnk3x/xunlei)](https://star-history.com/#cnk3x/xunlei&Date)
+[![GitHub Stars][1]][2] [![Docker Pulls][3]][5] [![Docker Version][4]][5]
+
+[1]: https://img.shields.io/github/stars/cnk3x/xunlei?style=flat
+[2]: https://star-history.com/#cnk3x/xunlei&Date
+[3]: https://img.shields.io/docker/pulls/cnk3x/xunlei.svg
+[4]: https://img.shields.io/docker/v/cnk3x/xunlei
+[5]: https://hub.docker.com/r/cnk3x/xunlei
 
 从迅雷群晖套件中提取出来用于其他设备的迅雷远程下载服务程序。仅供研究学习测试。 \
-本程序仅提供Linux模拟和容器化运行环境，未对原版迅雷程序进行任何修改。
+本程序仅提供 Linux 模拟和容器化运行环境，未对原版迅雷程序进行任何修改。
 
 ## 使用
 
@@ -21,7 +25,7 @@ ghcr.io/cnk3x/xunlei:latest
 
 **常规**的容器，还是要在特权模式下运行。
 
-如果docker的存储驱动如果是btrfs或者overlayfs，可以支持的非特权运行。
+如果 docker 的存储驱动如果是 btrfs 或者 overlayfs，可以支持的非特权运行。
 
 #### 环境变量参数
 
