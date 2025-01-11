@@ -28,7 +28,7 @@ latest:: build
 versioned:: build
 	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) -f docker/Dockerfile .
 
-push:: build 
+push:: build
 	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:$(VERSION) -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:latest -f docker/Dockerfile .
 
 binary:: build
@@ -45,7 +45,7 @@ wsl::
 	GOARCH=amd64 $(GO_BUILD) -v -o /usr/local/bin/xlp ./cmd/xlp
 
 home:: amd64
-	docker buildx build --push -t $(shell cat home.repo)/xunlei:$(VERSION) -f docker/Dockerfile .
+	docker buildx build --push -t $(HOME_REPO)/xunlei:$(VERSION) -f docker/Dockerfile .
 
 hello::
 	echo $(HELLO) $(VERSION)

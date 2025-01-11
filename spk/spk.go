@@ -52,11 +52,11 @@ func ExtractSpkPackage(ctx context.Context, src io.Reader, dstDir string) error 
 
 		switch {
 		case strings.HasPrefix(h.Name, "bin/bin/version"):
-			perm = 0666
+			perm = 0o666
 		case strings.HasPrefix(h.Name, "bin/bin/xunlei-pan-cli"):
-			perm = 0777
+			perm = 0o777
 		case h.Name == "ui/index.cgi":
-			perm = 0777
+			perm = 0o777
 		default:
 			return
 		}
@@ -109,9 +109,9 @@ func (d TarDecoder) Decode(r io.Reader) io.ReadCloser {
 type TarWalkFunc func(ctx context.Context, r io.Reader, h *tar.Header) (err error)
 
 func (w TarWalkFunc) Read(ctx context.Context, r io.Reader, h *tar.Header) (err error) {
-	defer io.Copy(io.Discard, r)
 	if w != nil {
-		return w(ctx, r, h)
+		err = w(ctx, r, h)
 	}
-	return nil
+	_, _ = io.Copy(io.Discard, r)
+	return
 }

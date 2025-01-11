@@ -4,3 +4,4 @@
 !.dockerignore
 !*.sh
 !*.go
+!*.txt

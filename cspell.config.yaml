@@ -1,0 +1,40 @@
+version: "0.2"
+ignorePaths: []
+dictionaryDefinitions: []
+dictionaries: []
+words:
+  - ALIR
+  - aliyuncs
+  - armv
+  - bfsu
+  - buildx
+  - dockerenv
+  - errgroup
+  - geminilake
+  - GITTAG
+  - GOARCH
+  - iofs
+  - localtime
+  - nasxunlei
+  - noninteractive
+  - PKGDEST
+  - PKGNAME
+  - PKGROOT
+  - PKGVER
+  - rdparty
+  - realpath
+  - rootfs
+  - shenzhen
+  - SYNO
+  - synoinfo
+  - synoman
+  - SYNOPKG
+  - SYNOPLATFORM
+  - tzdata
+  - ulikunitz
+  - wcgi
+  - webman
+  - xunlei
+  - zoneinfo
+ignoreWords: []
+import: []
