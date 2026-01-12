@@ -7,7 +7,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    permissions: { contents: read, packages: write }
+    permissions: { contents: write, packages: write, pull-requests: read }
 
     steps:
       - name: 检出代码仓库
