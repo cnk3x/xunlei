@@ -2,7 +2,7 @@ name: 构建、发布与多仓库镜像推送
 
 on:
   workflow_dispatch:
-  push: { tags: ["*"] }
+  # push: { tags: ["*"] }
 
 permissions:
   contents: write
