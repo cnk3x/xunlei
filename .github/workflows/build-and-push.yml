@@ -2,23 +2,19 @@ name: 构建并推送 xlp 程序与多架构镜像
 
 on:
   workflow_dispatch: # 手动触发（在GitHub仓库Actions页面可手动点击运行）
-  push:
-    tags:
-      - "*"
+  push: { tags: ["*"] }
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read # 读取仓库内容权限
-      packages: write # 推送GHCR镜像的权限
+    permissions: { contents: read, packages: write }
 
     steps:
-      - name: 检出代码仓库（最新tag）
-        uses: actions/checkout@v4
+      - name: 检出代码仓库
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # 拉取完整历史，确保能获取到所有tag信息
           repository: cnk3x/xunlei
+          fetch-depth: 0
           ref: ${{ github.ref }}
 
       - name: 提取程序版本号
@@ -34,9 +30,8 @@ jobs:
           echo "成功提取版本号：$VERSION"
 
       - name: 配置Golang环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25+"
+        uses: actions/setup-go@v6
+        with: { go-version: "stable" }
 
       - name: 静态编译Golang程序（多架构）
         run: |
@@ -46,9 +41,7 @@ jobs:
           echo "开始编译 linux/arm64 架构程序..."
           GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
-        env:
-          CGO_ENABLED: 0
-          GOOS: linux
+        env: { CGO_ENABLED: 0, GOOS: linux }
 
       - name: 重命名编译产物并打包压缩
         shell: bash
@@ -75,6 +68,9 @@ jobs:
             ./artifacts/xlp-arm64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: 设置Docker Buildx（支持多架构构建）
         uses: docker/setup-buildx-action@v3
