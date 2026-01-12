@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   # push: { tags: ["*"] }
 
-permissions:
-  contents: write
-  packages: write
-  actions: write
+# permissions:
+#   contents: write
+#   packages: write
+#   actions: write
 
 jobs:
   # Job 1：Prepare - 编译产物、提取版本号、归档Dockerfile
