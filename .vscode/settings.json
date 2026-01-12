@@ -1,11 +1,5 @@
 {
-  "gopls": {
-    "build.buildFlags": [],
-    "build.env": {
-      "GO111MODULE": "on",
-      "GOOS": "linux",
-      "GOARCH": "amd64"
+    "go.toolsEnvVars": {
+        "GOOS": "linux"
     }
-  },
-  "shellformat.flag": "-bn"
 }

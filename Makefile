@@ -1,54 +1,55 @@
-GHR := ghcr.io/cnk3x
-ALIR := registry.cn-shenzhen.aliyuncs.com/cnk3x
-HUB := cnk3x
+DCR := docker.io/cnk3x/
+ACR := registry.cn-shenzhen.aliyuncs.com/cnk3x/
+GHCR := ghcr.io/cnk3x/
+NAME := xlp
 
-GITTAG := $(shell git describe --tags --always)
-GO_BUILD := CGO_ENABLED=0 GOOS=linux go build -v -ldflags '-s -w -X main.version=$(GITTAG)'
+http_proxy := http://host.docker.internal:7890
+https_proxy := http://host.docker.internal:7890
 
-DOCKER_BUILD := docker buildx build --push --platform linux/amd64,linux/arm64
+GoBuild := CGO_ENABLED=0 GOOS=linux go build -v -ldflags '-s -w'
+DProxy := --build-arg http_proxy=$(http_proxy) --build-arg https_proxy=$(https_proxy)
+DBuildBase := docker buildx build $(DProxy)
+DBuild := $(DBuildBase) --push --platform linux/amd64,linux/arm64
 
-VERSION := $(GITTAG)
+VERSION := $(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
 
-showTag:
-	@echo $(GITTAG)
+showTag::
+	@echo version is $(VERSION)
 
 amd64::
-	rm -f bin/xlp-amd64*
-	GOARCH=amd64 $(GO_BUILD) -v -o bin/xlp-amd64 ./cmd/xlp
+	GOARCH=amd64 $(GoBuild) -v -o artifacts/xlp-amd64 ./cmd/xlp
 
 arm64::
-	rm -f bin/xlp-arm64*
-	GOARCH=arm64 $(GO_BUILD) -v -o bin/xlp-arm64 ./cmd/xlp
+	GOARCH=arm64 $(GoBuild) -v -o artifacts/xlp-arm64 ./cmd/xlp
 
 build:: amd64 arm64
 
 latest:: build
-	$(DOCKER_BUILD) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:latest -f docker/Dockerfile .
+	$(DBuild) -t $(DCR)$(NAME):latest -t $(GHCR)$(NAME):latest -t $(ACR)$(NAME):latest .
 
-versioned:: build
-	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(GHR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:$(VERSION) -f docker/Dockerfile .
+tagged:: build
+	$(DBuild) -t $(DCR)$(NAME):$(VERSION) -t $(GHCR)$(NAME):$(VERSION) -t $(ACR)$(NAME):$(VERSION) .
 
 push:: build
-	$(DOCKER_BUILD) -t $(HUB)/xunlei:$(VERSION) -t $(HUB)/xunlei:latest -t $(GHR)/xunlei:$(VERSION) -t $(GHR)/xunlei:latest -t $(ALIR)/xunlei:$(VERSION) -t $(ALIR)/xunlei:latest -f docker/Dockerfile .
+	$(DBuild) -t $(DCR)$(NAME):$(VERSION) -t $(DCR)$(NAME):latest -t $(GHCR)$(NAME):$(VERSION) -t $(GHCR)$(NAME):latest -t $(ACR)$(NAME):$(VERSION) -t $(ACR)$(NAME):latest .
 
 binary:: build
-	rm -f bin/xlp bin/xlp-amd64.tar.gz
-	cp bin/xlp-amd64 bin/xlp
-	tar -zcf bin/xlp-amd64.tar.gz -C bin xlp
-	rm -f bin/xlp bin/xlp-arm64.tar.gz
-	cp bin/xlp-arm64 bin/xlp
-	tar -zcf bin/xlp-arm64.tar.gz -C bin xlp
-	rm -f bin/xlp
+	@mv artifacts/xlp-amd64 artifacts/xlp
+	@tar -zcf artifacts/xlp-amd64.tar.gz -C artifacts xlp
+	@mv artifacts/xlp artifacts/xlp-amd64
+	@mv artifacts/xlp-arm64 artifacts/xlp
+	@tar -zcf artifacts/xlp-arm64.tar.gz -C artifacts xlp
+	@mv artifacts/xlp artifacts/xlp-arm64
+	@ls -lh artifacts
 
 wsl::
-	rm -f /usr/local/bin/xlp
-	GOARCH=amd64 $(GO_BUILD) -v -o /usr/local/bin/xlp ./cmd/xlp
+	GOARCH=amd64 $(GoBuild) -v -o /usr/local/bin/xlp ./cmd/xlp
 
 home:: amd64
-	docker buildx build --push -t $(HOME_REPO)/xunlei:$(VERSION) -f docker/Dockerfile .
+	docker buildx build --push -t $(HOME_REPO)$(NAME):$(VERSION) .
 
-hello::
-	echo $(HELLO) $(VERSION)
+load:: amd64
+	docker buildx build --load -t $(NAME):$(VERSION) .
 
-scp:: amd64
-	scp ./bin/xlp-amd64 root@192.168.99.12:/usr/local/bin/xlp
+ubuntu::
+	$(DBuildBase) --load -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .

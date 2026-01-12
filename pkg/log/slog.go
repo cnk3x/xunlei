@@ -28,6 +28,15 @@ const (
 )
 
 const errKey = "err"
+const prefixKey = "prefix"
+
+type contextKey struct{ name string }
+
+var ctxPrefixKey = contextKey{"prefix"}
+
+func Prefix(ctx context.Context, prefix string) context.Context {
+	return context.WithValue(ctx, ctxPrefixKey, prefix)
+}
 
 var (
 	defaultLevel      = slog.LevelInfo
@@ -118,19 +127,6 @@ func (h *handler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level.Level()
 }
 
-type contextKey struct{ name string }
-
-var prefixKey = contextKey{"prefix"}
-
-func Prefix(ctx context.Context, prefix string) context.Context {
-	return context.WithValue(ctx, prefixKey, prefix)
-}
-
-func GetPrefix(ctx context.Context) (prefix string) {
-	prefix, _ = ctx.Value(prefixKey).(string)
-	return
-}
-
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	// get a buffer from the sync pool
 	buf := newBuffer()
@@ -139,18 +135,35 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 	rep := h.replaceAttr
 
 	var src *slog.Source
+	var prefix string
 
 	r.Attrs(func(attr slog.Attr) bool {
-		if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
+		if isTime(attr) {
 			r.Time = attr.Value.Time()
 		}
 
-		if attr.Key == slog.SourceKey && attr.Value.Kind() == slog.KindAny {
+		if isSource(attr) {
 			src, _ = attr.Value.Any().(*slog.Source)
+		}
+
+		if isPrefix(attr) {
+			prefix = attr.Value.String()
+		}
+
+		if isLevel(attr) {
+			r.Level = slog.Level(attr.Value.Int64())
+		}
+
+		if isMessage(attr) {
+			r.Message = attr.Value.String()
 		}
 
 		return true
 	})
+
+	if prefix == "" {
+		prefix, _ = ctx.Value(ctxPrefixKey).(string)
+	}
 
 	// write time
 	if !r.Time.IsZero() {
@@ -200,7 +213,7 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 		}
 	}
 
-	if prefix := GetPrefix(ctx); prefix != "" {
+	if prefix != "" {
 		buf.WriteByte('[')
 		buf.WriteString(prefix)
 		buf.WriteByte(']')
@@ -223,11 +236,7 @@ func (h *handler) Handle(ctx context.Context, r slog.Record) error {
 
 	// write attributes
 	r.Attrs(func(attr slog.Attr) bool {
-		if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
-			return true
-		}
-
-		if attr.Key == slog.SourceKey && attr.Value.Kind() == slog.KindAny {
+		if isPrefix(attr) || isTime(attr) || isSource(attr) || isLevel(attr) || isMessage(attr) {
 			return true
 		}
 
@@ -457,3 +466,17 @@ func needsQuoting(s string) bool {
 	}
 	return false
 }
+
+func isPrefix(attr slog.Attr) bool { return attr.Key == prefixKey }
+
+func isSource(attr slog.Attr) bool {
+	return attr.Key == slog.SourceKey && attr.Value.Kind() == slog.KindAny
+}
+
+func isTime(attr slog.Attr) bool {
+	return attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime
+}
+
+func isLevel(attr slog.Attr) bool { return attr.Key == slog.LevelKey }
+
+func isMessage(attr slog.Attr) bool { return attr.Key == slog.MessageKey }

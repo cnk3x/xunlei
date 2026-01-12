@@ -2,9 +2,8 @@ package spk
 
 import (
 	"archive/tar"
-	"bytes"
+	"cmp"
 	"context"
-	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -12,59 +11,89 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cnk3x/xunlei/pkg/iofs"
-	"github.com/cnk3x/xunlei/pkg/lod"
+	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/ulikunitz/xz"
 )
 
-// ExtractEmbedSpk 从迅雷SPK中提取需要的文件
-func ExtractEmbedSpk(ctx context.Context, dstDir string) error {
-	return ExtractSpk(ctx, bytes.NewReader(Bytes), dstDir)
-}
-
-// ExtractSpkFile 从迅雷SPK中提取需要的文件
-func ExtractSpkFile(ctx context.Context, srcPath string, dstDir string) error {
-	src, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-	return ExtractSpk(ctx, src, dstDir)
-}
-
-// ExtractSpk 从迅雷SPK中提取需要的文件
-func ExtractSpk(ctx context.Context, src io.Reader, dstDir string) (err error) {
-	return TarExtract(ctx, src, func(ctx context.Context, tr io.Reader, h *tar.Header) (err error) {
+// Extract 从迅雷SPK中提取需要的文件(存在则跳过)
+func Extract(ctx context.Context, src io.Reader, dstDir string, overwrite bool) (err error) {
+	return Walk(ctx, src, func(tr io.Reader, h *tar.Header) (err error) {
 		if h.Name == "package.tgz" {
-			if err = ExtractSpkPackage(ctx, tr, dstDir); err != nil {
+			err = cmp.Or(Walk(ctx, tr, func(tr io.Reader, h *tar.Header) (err error) {
+				var perm fs.FileMode
+				switch {
+				case strings.HasPrefix(h.Name, "bin/bin/version"):
+					perm = 0o666
+				case strings.HasPrefix(h.Name, "bin/bin/xunlei-pan-cli"):
+					perm = fs.ModePerm
+				case h.Name == "ui/index.cgi":
+					perm = fs.ModePerm
+				default:
+					return
+				}
+
+				err = func() (err error) {
+					target := filepath.Join(dstDir, h.Name)
+					if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+						return
+					}
+
+					flag := os.O_RDWR | os.O_CREATE
+					if overwrite {
+						flag |= os.O_TRUNC
+					} else {
+						flag |= os.O_EXCL
+					}
+					f, e := os.OpenFile(target, flag, perm)
+					if e != nil {
+						if !os.IsExist(e) {
+							err = e
+						}
+						return
+					}
+					_, err = io.Copy(f, tr)
+					if ce := f.Close(); err == nil && ce != nil {
+						err = ce
+					}
+					return
+				}()
+
+				slog.Log(ctx, log.ErrDebug(err), "extract package", "perm", perm, "target_dir", dstDir, "name", h.Name, "err", err)
 				return
-			}
-			err = fs.SkipAll
+			}, Xz), io.EOF)
 		}
 		return
 	})
 }
 
-// ExtractSpkPackage 从迅雷SPK文件内的package.tgz中提取需要的文件
-func ExtractSpkPackage(ctx context.Context, src io.Reader, dstDir string) error {
-	return TarExtract(ctx, src, func(ctx context.Context, tr io.Reader, h *tar.Header) (err error) {
-		var perm fs.FileMode
+/* tar decode functions */
 
-		switch {
-		case strings.HasPrefix(h.Name, "bin/bin/version"):
-			perm = 0o666
-		case strings.HasPrefix(h.Name, "bin/bin/xunlei-pan-cli"):
-			perm = 0o777
-		case h.Name == "ui/index.cgi":
-			perm = 0o777
-		default:
-			return
+func Walk(ctx context.Context, src io.Reader, walk WalkFunc, decoder ...Decoder) (err error) {
+	dr := io.NopCloser(src)
+
+	for _, d := range decoder {
+		if d != nil {
+			if dr, err = d(dr); err != nil {
+				return
+			}
+			defer dr.Close()
 		}
+	}
 
-		err = iofs.WriteFileContext(ctx, tr, filepath.Join(dstDir, h.Name), perm)
-		slog.Log(ctx, lod.ErrDebug(err), "extract package", "perm", perm, "target_dir", dstDir, "name", h.Name, "err", err)
-		return
-	}, Xz)
+	for tr := tar.NewReader(dr); ; {
+		hdr, e := tr.Next()
+		if err = e; err != nil {
+			break
+		}
+		if err = walk(tr, hdr); err != nil {
+			break
+		}
+	}
+
+	if err == io.EOF {
+		err = nil
+	}
+	return
 }
 
 func Xz(src io.Reader) (io.ReadCloser, error) {
@@ -72,46 +101,6 @@ func Xz(src io.Reader) (io.ReadCloser, error) {
 	return io.NopCloser(xzr), err
 }
 
-/* tar decode functions */
+type Decoder func(io.Reader) (io.ReadCloser, error)
 
-type TarDecoder func(io.Reader) (io.ReadCloser, error)
-
-func TarExtract(ctx context.Context, src io.Reader, walk TarWalkFunc, decoder ...TarDecoder) (err error) {
-	dr := lod.First(decoder).Decode(src)
-	defer dr.Close()
-
-	var hdr *tar.Header
-	tr := tar.NewReader(dr)
-	for hdr, err = tr.Next(); err != io.EOF; hdr, err = tr.Next() {
-		if err != nil {
-			return
-		}
-		err = walk.Read(ctx, tr, hdr)
-	}
-
-	if errors.Is(err, fs.SkipAll) || err == io.EOF {
-		err = nil
-	}
-	return
-}
-
-func (d TarDecoder) Decode(r io.Reader) io.ReadCloser {
-	if d != nil {
-		if rc, err := d(r); err == nil {
-			return rc
-		} else {
-			return iofs.ErrRw(err)
-		}
-	}
-	return io.NopCloser(r)
-}
-
-type TarWalkFunc func(ctx context.Context, r io.Reader, h *tar.Header) (err error)
-
-func (w TarWalkFunc) Read(ctx context.Context, r io.Reader, h *tar.Header) (err error) {
-	if w != nil {
-		err = w(ctx, r, h)
-	}
-	_, _ = io.Copy(io.Discard, r)
-	return
-}
+type WalkFunc func(r io.Reader, h *tar.Header) (err error)

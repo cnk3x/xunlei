@@ -23,62 +23,110 @@ registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:latest
 ghcr.io/cnk3x/xunlei:latest
 ```
 
-**常规**的容器，还是要在特权模式下运行。
+#### 参数
 
-如果 docker 的存储驱动如果是 btrfs 或者 overlayfs，可以支持的非特权运行。
+程序默认参数
 
-#### 环境变量参数
+```
+OPTIONS:
+      --dashboard_port uint16       网页访问的端口 [XL_DASHBOARD_PORT] (default 2345)
+      --dashboard_ip ip             网页访问绑定IP，默认绑定所有IP [XL_DASHBOARD_IP]
+      --dashboard_username string   网页访问的用户名 [XL_DASHBOARD_USERNAME]
+      --dashboard_password string   网页访问的密码 [XL_DASHBOARD_PASSWORD]
+  -d, --dir_download strings        下载保存文件夹，可多次指定，需确保有权限访问 [XL_DIR_DOWNLOAD] (default [./xunlei/downloads])
+  -D, --dir_data string             程序数据保存文件夹，存储了登录的账号，下载进度等信息 [XL_DIR_DATA] (default "./xunlei/data")
+  -u, --uid uint32                  运行迅雷的用户ID [XL_UID, UID]
+  -g, --gid uint32                  运行迅雷的用户组ID [XL_GID, GID]
+      --prevent_update              阻止更新 [XL_PREVENT_UPDATE]
+  -r, --chroot string               CHROOT主目录 [XL_CHROOT] (default "./xunlei")
+      --spk string                  SPK 下载链接 [XL_SPK_URL] (default "https://down.sandai.net/nas/nasxunlei-DSM7-x86_64.spk")
+  -F, --force_download              强制下载
+      --debug                       是否开启调试日志 [XL_DEBUG]
+```
 
-```bash
-XL_DASHBOARD_PORT      #网页访问的端口，默认 2345
-XL_DASHBOARD_IP        #网页访问的端口，默认 0.0.0.0（代表所有IP）
-XL_DASHBOARD_USERNAME  #网页访问的用户名
-XL_DASHBOARD_PASSWORD  #网页访问的密码
-XL_DIR_DOWNLOAD        #下载保存默认文件夹，默认 /xunlei/downloads，多个文件夹用冒号:分隔
-XL_DIR_DATA            #程序数据保存文件夹，默认 /xunlei/data
-XL_UID                 #运行迅雷的用户ID
-XL_GID                 #运行迅雷的用户组ID
-XL_PREVENT_UPDATE      #是否阻止更新，默认 true, 可选值 true/false, 1/0
-XL_CHROOT              #隔离运行主目录, 指定该值且不为`/`则以隔离模式运行, 用于在容器内隔离环境，容器内默认为 /xunlei，隔离模式运行需要特权模式(--privileged)，可以将该值设置为`/`来以非特权模式运行。非特权模式运行有条件，可以尝试失败后使用特权模式重新运行。
-XL_DEBUG               #调试模式, 可选值 true/false, 1/0
+容器内参数默认值（在容器内运行时，覆盖程序默认参数）
+
+```shell
+#网页访问的端口
+XL_DASHBOARD_PORT=2345
+#网页访问绑定IP
+XL_DASHBOARD_IP=
+# 网页访问的用户名
+XL_DASHBOARD_USERNAME=
+# 网页访问的密码
+XL_DASHBOARD_PASSWORD=
+# 下载保存文件夹，多个用冒号`:`隔开
+XL_DIR_DOWNLOAD=/xunlei/downloads
+# 程序数据保存文件夹，存储了登录的账号，下载进度等信息
+XL_DIR_DATA=/xunlei/data
+# CHROOT主目录，这个不要改
+XL_CHROOT=/xunlei
+# 阻止更新
+XL_PREVENT_UPDATE=true
+# SPK下载链接
+XL_SPK_URL=https://down.sandai.net/nas/nasxunlei-DSM7-(x86_64或者armv8).spk
+# 运行迅雷的用户ID
+XL_UID=
+# 运行迅雷的用户GID
+XL_GID=
+# 是否开启调试日志
+XL_DEBUG=
 ```
 
 #### 在容器中运行
 
 ```bash
+# 容器需要 SYS_ADMIN 权限运行，添加参数 --privileged 或者 --cap-add=SYS_ADMIN
+
 # docker run -d \
 #   -v <数据目录>:/xunlei/data \
 #   -v <默认下载保存目录>:/xunlei/downloads \
 #   -p <访问端口>:2345 \
-#   --privileged \
-#   cnk3x/xunlei
+#   --cap-add=SYS_ADMIN \
+#   cnk3x/xunlei:latest
 
 # example
-docker run --privileged -v /mnt/sdb1/configs/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 cnk3x/xunlei
-
-# 如果你的docker存储驱动是 overlayfs 或者 btrfs等, 可以不用特权运行
-docker run -e XL_CHROOT=/ -v /mnt/sdb1/configs/xunlei:/xunlei/data -v /mnt/sdb1/downloads:/xunlei/downloads -p 2345:2345 cnk3x/xunlei
-
+docker run \
+--name xunlei \
+--hostname mynas \
+-v /mnt/sdb1/configs/xunlei:/xunlei/data \
+-v /mnt/sdb1/downloads:/xunlei/downloads \
+-p 2345:2345 \
+--cap-add=SYS_ADMIN \
+cnk3x/xunlei
 ```
 
-也可以直接运行
+#### docker-compose
 
-```plain
-$ bin/xlp-amd64 --help
+```yaml
+services:
+    xunlei:
+        container_name: xunlei
+        image: cnk3x/xunlei:latest
+        restart: unless-stopped
 
-Flags:
-  -p, --dashboard_port      网页访问的端口 (env: XL_DASHBOARD_PORT) (default 2345)
-  -i, --dashboard_ip        网页访问绑定IP，默认绑定所有IP (env: XL_DASHBOARD_IP)
-  -u, --dashboard_username  网页访问的用户名 (env: XL_DASHBOARD_USERNAME)
-  -k, --dashboard_password  网页访问的密码 (env: XL_DASHBOARD_PASSWORD)
-      --dir_download        下载保存文件夹，可多次指定，需确保有权限访问 (env: XL_DIR_DOWNLOAD) (default [/xunlei/downloads])
-      --dir_data            程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息 (env: XL_DIR_DATA) (default "/xunlei/data")
-      --uid                 运行迅雷的用户ID (env: XL_UID, UID)
-      --gid                 运行迅雷的用户组ID (env: XL_GID, GID)
-      --prevent_update      阻止更新 (env: XL_PREVENT_UPDATE) (default true)
-  -r, --chroot              CHROOT主目录, 指定该值且不为/则以chroot模式运行, 用于在容器内隔离环境 (env: XL_CHROOT) (default "/")
-      --debug               是否开启调试日志 (env: XL_DEBUG)
-  -v, --version             显示版本信息
+        # 宿主机名，迅雷远程控制的名称与此相关，一般是 `群晖-${hostname}`
+        hostname: my_storage
+        # 必须, cap_add: [SYS_ADMIN] 和 privileged: true 二选一
+        cap_add: [SYS_ADMIN]
+        ports: [2345:2345] # 面板访问端口，如需更改，替换前面的2345即可
+        environment:
+            # 如果需要指定多个下载目录，手动指定XL_DIR_DOWNLOAD
+            # 多个以冒号`:`隔开，都必须以 /xunlei 开头，迅雷面板选择保存路径显示会去掉/xunlei前缀
+            # 指定后可以在 volumes 中绑定宿主机实际目录
+            # 迅雷云盘的缓存会使用第一个目录会缓存
+            # /xunlei/后面可以用中文
+            # 不设置默认一个目录 /xunlei/downloads
+            - XL_DIR_DOWNLOAD=/xunlei/downloads:/xunlei/movies:/xunlei/apps
+        volumes:
+            # 对应 XL_DIR_DOWNLOAD 指定的目录, 请替换冒号前面的路径为实际路径
+            - 实际【下载】文件夹路径:/xunlei/downloads
+            - 实际【电影】文件夹路径:/xunlei/movies
+            - 实际【软件】文件夹路径:/xunlei/apps
+            # 数据目录，必须，迅雷运行时，插件，升级，包括登录数据都在这
+            - ./data:/xunlei/data
+            # 可选，不配置每次启动都会从远程下载spk
+            - ./cache:/xunlei/var/packages/pan-xunlei-com
 ```
 
 ## Used By

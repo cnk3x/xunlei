@@ -5,8 +5,9 @@ local/
 .idea/
 
 bin/
-rootfs/
+/rootfs/
 home.repo
 
 testdata/
-*.Dockerfile
+/amd64/
+artifacts/
