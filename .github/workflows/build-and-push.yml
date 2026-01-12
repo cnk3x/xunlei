@@ -4,11 +4,10 @@ on:
   workflow_dispatch:
   push: { tags: ["*"] }
 
-# 全局权限配置：满足所有Job的权限需求
 permissions:
-  contents: write # 创建Release、读取仓库内容所需
-  packages: write # 推送/拉取GHCR镜像所需
-  actions: read # 上传/下载产物所需
+  contents: write
+  packages: write
+  actions: write
 
 jobs:
   # Job 1：Prepare - 编译产物、提取版本号、归档Dockerfile
@@ -87,8 +86,7 @@ jobs:
       # 步骤3：创建GitHub Release并上传压缩包资产
       - name: 创建GitHub Release并上传资产
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}}
         with:
           tag_name: ${{ needs.Prepare.outputs.app_version }}
           name: ${{ needs.Prepare.outputs.app_version }}
