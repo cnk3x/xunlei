@@ -1,115 +1,113 @@
 name: 构建并推送 xlp 程序与多架构镜像
 
 on:
-    workflow_dispatch: # 手动触发（在GitHub仓库Actions页面可手动点击运行）
-    push:
-        tags:
-            - "*"
+  workflow_dispatch: # 手动触发（在GitHub仓库Actions页面可手动点击运行）
+  push:
+    tags:
+      - "*"
 
 jobs:
-    build-and-push:
-        runs-on: ubuntu-latest # 使用Ubuntu最新版运行环境
-        permissions:
-            contents: read # 读取仓库内容权限
-            packages: write # 推送GHCR镜像的权限
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # 读取仓库内容权限
+      packages: write # 推送GHCR镜像的权限
 
-        steps:
-            - name: 检出代码仓库（最新tag）
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # 拉取完整历史，确保能获取到所有tag信息
-                  repository: cnk3x/xunlei # 目标仓库地址
-                  ref: ${{ github.ref }} # 关联触发的tag（tag触发时）或手动触发时的默认分支
+    steps:
+      - name: 检出代码仓库（最新tag）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 拉取完整历史，确保能获取到所有tag信息
+          repository: cnk3x/xunlei
+          ref: ${{ github.ref }}
 
-            - name: 提取程序版本号
-              id: get_version
-              run: |
-                  VERSION=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
-                  if [ -z "$VERSION" ]; then
-                    echo "错误：未能从xlp.go中提取到版本号"
-                    exit 1
-                  fi
-                  # 将版本号设置为GitHub Action环境变量，后续步骤可通过 steps.get_version.outputs.version 访问
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  echo "成功提取版本号：$VERSION"
+      - name: 提取程序版本号
+        id: get_version
+        run: |
+          VERSION=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
+          if [ -z "$VERSION" ]; then
+            echo "错误：未能从xlp.go中提取到版本号"
+            exit 1
+          fi
+          # 将版本号设置为GitHub Action环境变量，后续步骤可通过 steps.get_version.outputs.version 访问
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "成功提取版本号：$VERSION"
 
-            - name: 配置Golang环境
-              uses: actions/setup-go@v5
-              with:
-                  go-version: "1.25+" # 指定Golang版本（可根据项目需求调整）
+      - name: 配置Golang环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25+"
 
-            - name: 静态编译Golang程序（多架构）
-              run: |
-                  mkdir -p ./artifacts
-                  echo "开始编译 linux/amd64 架构程序..."
-                  GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
-                  echo "开始编译 linux/arm64 架构程序..."
-                  GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
-                  ls -lh ./artifacts
-              env:
-                  CGO_ENABLED: 0 # 禁用CGO，确保静态编译
-                  GOOS: linux
+      - name: 静态编译Golang程序（多架构）
+        run: |
+          mkdir -p ./artifacts
+          echo "开始编译 linux/amd64 架构程序..."
+          GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
+          echo "开始编译 linux/arm64 架构程序..."
+          GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
+          ls -lh ./artifacts
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
 
-            - name: 重命名编译产物并打包压缩
-              shell: bash
-              run: |
-                  cd ./artifacts
-                  echo "处理 amd64 架构产物..."
-                  mv xlp-amd64 xlp
-                  tar -zcvf xlp-amd64.tar.gz xlp
-                  mv xlp xlp-amd64
-                  echo "处理 arm64 架构产物..."
-                  mv xlp-arm64 xlp
-                  tar -zcvf xlp-arm64.tar.gz xlp
-                  mv xlp xlp-arm64
-                  echo "打包完成，当前产物目录文件列表："
-                  ls -lh
+      - name: 重命名编译产物并打包压缩
+        shell: bash
+        run: |
+          cd ./artifacts
+          echo "处理 amd64 架构产物..."
+          mv xlp-amd64 xlp
+          tar -zcvf xlp-amd64.tar.gz xlp
+          mv xlp xlp-amd64
+          echo "处理 arm64 架构产物..."
+          mv xlp-arm64 xlp
+          tar -zcvf xlp-arm64.tar.gz xlp
+          mv xlp xlp-arm64
+          echo "打包完成，当前产物目录文件列表："
+          ls -lh
 
-            - name: 创建 GitHub Release 并上传压缩包
-              uses: softprops/action-gh-release@v1
-              with:
-                  tag_name: ${{ steps.get_version.outputs.version }}
-                  name: ${{ steps.get_version.outputs.version }}
-              files: |
-                  ./artifacts/xlp-amd64.tar.gz
-                  ./artifacts/xlp-arm64.tar.gz
-              overwrite: false
-              prerelease: false
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 创建 GitHub Release 并上传压缩包
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: ${{ steps.get_version.outputs.version }}
+          files: |
+            ./artifacts/xlp-amd64.tar.gz
+            ./artifacts/xlp-arm64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: 设置Docker Buildx（支持多架构构建）
-              uses: docker/setup-buildx-action@v3
+      - name: 设置Docker Buildx（支持多架构构建）
+        uses: docker/setup-buildx-action@v3
 
-            - name: 登录Docker Hub
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DCR_USER }}
-                  password: ${{ secrets.DCR_TOKEN }}
+      - name: 登录Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DCR_USER }}
+          password: ${{ secrets.DCR_TOKEN }}
 
-            - name: 登录阿里云容器镜像服务
-              uses: docker/login-action@v3
-              with:
-                  registry: registry.cn-shenzhen.aliyuncs.com
-                  username: ${{ secrets.ACR_USER }}
-                  password: ${{ secrets.ACR_TOKEN }}
+      - name: 登录阿里云容器镜像服务
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-shenzhen.aliyuncs.com
+          username: ${{ secrets.ACR_USER }}
+          password: ${{ secrets.ACR_TOKEN }}
 
-            - name: 登录GHCR.io（GitHub容器仓库）
-              uses: docker/login-action@v3
-              with:
-                  registry: ghcr.io
-                  username: ${{ github.actor }} # 当前GitHub操作执行者用户名
-                  password: ${{ secrets.GITHUB_TOKEN }} # GitHub自动生成的令牌（具备packages写入权限）
+      - name: 登录GHCR.io（GitHub容器仓库）
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} # 当前GitHub操作执行者用户名
+          password: ${{ secrets.GITHUB_TOKEN }} # GitHub自动生成的令牌（具备packages写入权限）
 
-            - name: 构建并推送Docker镜像
-              uses: docker/build-push-action@v5
-              with:
-                  context: .
-                  push: true
-                  platforms: linux/amd64,linux/arm64
-                  tags: |
-                      cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-                      ghcr.io/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-                      registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-                  cache-from: type=gha # 启用GH Action缓存，加速后续构建
-                  cache-to: type=gha,mode=max # 保存缓存到GH Action，最大化缓存内容
+      - name: 构建并推送Docker镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            cnk3x/xunlei:${{ steps.get_version.outputs.version }}
+            ghcr.io/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
+            registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
+          cache-from: type=gha # 启用GH Action缓存，加速后续构建
+          cache-to: type=gha,mode=max # 保存缓存到GH Action，最大化缓存内容
