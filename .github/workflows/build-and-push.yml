@@ -1,22 +1,31 @@
-name: 构建并推送 xlp 程序与多架构镜像
+name: 构建、发布与多仓库镜像推送
 
 on:
-  workflow_dispatch: # 手动触发（在GitHub仓库Actions页面可手动点击运行）
+  workflow_dispatch:
   push: { tags: ["*"] }
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    permissions: { contents: write, packages: write, pull-requests: read }
+# 全局权限配置：满足所有Job的权限需求
+permissions:
+  contents: write # 创建Release、读取仓库内容所需
+  packages: write # 推送/拉取GHCR镜像所需
+  actions: read # 上传/下载产物所需
 
+jobs:
+  # Job 1：Prepare - 编译产物、提取版本号、归档Dockerfile
+  Prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.get_version.outputs.version }} # 导出版本号，供后续Job使用
     steps:
-      - name: 检出代码仓库
+      # 步骤1：拉取最新tag代码仓库
+      - name: 检出代码仓库（最新tag）
         uses: actions/checkout@v6
         with:
-          repository: cnk3x/xunlei
           fetch-depth: 0
+          repository: cnk3x/xunlei
           ref: ${{ github.ref }}
 
+      # 步骤2：提取程序版本号
       - name: 提取程序版本号
         id: get_version
         run: |
@@ -25,61 +34,163 @@ jobs:
             echo "错误：未能从xlp.go中提取到版本号"
             exit 1
           fi
-          # 将版本号设置为GitHub Action环境变量，后续步骤可通过 steps.get_version.outputs.version 访问
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "成功提取版本号：$VERSION"
 
+      # 步骤3：配置Golang环境
       - name: 配置Golang环境
         uses: actions/setup-go@v6
         with: { go-version: "stable" }
 
+      # 步骤4：静态编译Golang程序（amd64/arm64）
       - name: 静态编译Golang程序（多架构）
         run: |
           mkdir -p ./artifacts
-          echo "开始编译 linux/amd64 架构程序..."
-          GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
-          echo "开始编译 linux/arm64 架构程序..."
-          GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
         env: { CGO_ENABLED: 0, GOOS: linux }
 
-      - name: 重命名编译产物并打包压缩
-        shell: bash
+      # 步骤5：归档Dockerfile（与编译产物一起存储）
+      - name: 复制Dockerfile到产物目录
+        run: |
+          cp ./Dockerfile ./artifacts/  # 复制根目录Dockerfile到artifacts目录
+          ls -lh ./artifacts  # 验证产物目录（包含xlp-amd64、xlp-arm64、Dockerfile）
+
+      # 步骤6：上传产物包（编译文件+Dockerfile），供后续Job下载
+      - name: 上传Prepare产物到Action仓库
+        uses: actions/upload-artifact@v6
+        with: { name: prepare-artifacts, path: ./artifacts/, retention-days: 1 }
+
+  # Job 2：Release - 推送GitHub Release（依赖Prepare）
+  Release:
+    runs-on: ubuntu-latest
+    needs: Prepare
+    steps:
+      # 步骤1：下载Prepare Job的产物包
+      - name: 下载Prepare产物
+        uses: actions/download-artifact@v7
+        with: { name: prepare-artifacts, path: ./artifacts/ }
+
+      # 步骤2：重命名产物并打包为tar.gz（用于Release上传）
+      - name: 重命名并打包编译产物
         run: |
           cd ./artifacts
-          echo "处理 amd64 架构产物..."
           mv xlp-amd64 xlp
           tar -zcvf xlp-amd64.tar.gz xlp
           mv xlp xlp-amd64
-          echo "处理 arm64 架构产物..."
           mv xlp-arm64 xlp
           tar -zcvf xlp-arm64.tar.gz xlp
           mv xlp xlp-arm64
-          echo "打包完成，当前产物目录文件列表："
-          ls -lh
+          ls -lh *.tar.gz
 
-      - name: 创建 GitHub Release 并上传压缩包
+      # 步骤3：创建GitHub Release并上传压缩包资产
+      - name: 创建GitHub Release并上传资产
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ needs.Prepare.outputs.app_version }}
+          name: ${{ needs.Prepare.outputs.app_version }}
           files: |
             ./artifacts/xlp-amd64.tar.gz
             ./artifacts/xlp-arm64.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Job 3：DockerBuild - 构建镜像并推送至GHCR（依赖Prepare）
+  DockerBuild:
+    runs-on: ubuntu-latest
+    needs: Prepare
+    steps:
+      # 步骤1：下载Prepare Job的产物包（编译文件+Dockerfile）
+      - name: 下载Prepare产物
+        uses: actions/download-artifact@v7
+        with: { name: prepare-artifacts, path: ./artifacts/ }
+
+      # 步骤2：将产物移动到根目录（保证Dockerfile构建上下文正确）
+      - name: 整理构建上下文
+        run: |
+          cp ./artifacts/Dockerfile ./
+          ls -lh ./
+          ls -lh ./artifacts
+
+      # 步骤3：配置Docker Buildx（支持多架构构建）
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: 设置Docker Buildx（支持多架构构建）
+      - name: 设置Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      # 步骤4：登录GHCR.io仓库（用于推送镜像）
+      - name: 登录GHCR.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+
+      # 步骤5：构建并推送多架构镜像到GHCR
+      - name: 构建并推送镜像到GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: . # 构建上下文为根目录
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ghcr.io/cnk3x/xunlei:${{ needs.Prepare.outputs.app_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 4：DcrPush - 从GHCR拉取镜像并推送至Docker Hub（依赖Prepare）
+  DcrPush:
+    runs-on: ubuntu-latest
+    needs: [Prepare, DockerBuild]
+    steps:
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录GHCR.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: 登录Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DCR_USER }}
           password: ${{ secrets.DCR_TOKEN }}
+
+      - name: 拉取GHCR多架构镜像并推送至Docker Hub
+        run: |
+          VERSION=${{ needs.Prepare.outputs.app_version }}
+          GHCR_IMAGE=ghcr.io/cnk3x/xunlei:$VERSION
+          DOCKER_IMAGE=cnk3x/xunlei:$VERSION
+          # 核心命令：创建多架构镜像标签并推送
+          docker buildx imagetools create -t $DOCKER_IMAGE $GHCR_IMAGE
+          echo "验证Docker Hub多架构镜像清单："
+          docker buildx imagetools inspect $DOCKER_IMAGE
+          echo "成功将多架构镜像推送至Docker Hub：$DOCKER_IMAGE"
+
+  # Job 5：AcrPush - 从GHCR拉取镜像并推送至阿里云容器镜像服务（依赖Prepare）
+  AcrPush:
+    runs-on: ubuntu-latest
+    needs: [Prepare, DockerBuild]
+    steps:
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录GHCR.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 登录阿里云容器镜像服务
         uses: docker/login-action@v3
@@ -88,22 +199,13 @@ jobs:
           username: ${{ secrets.ACR_USER }}
           password: ${{ secrets.ACR_TOKEN }}
 
-      - name: 登录GHCR.io（GitHub容器仓库）
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }} # 当前GitHub操作执行者用户名
-          password: ${{ secrets.GITHUB_TOKEN }} # GitHub自动生成的令牌（具备packages写入权限）
-
-      - name: 构建并推送Docker镜像
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-            ghcr.io/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-            registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-          cache-from: type=gha # 启用GH Action缓存，加速后续构建
-          cache-to: type=gha,mode=max # 保存缓存到GH Action，最大化缓存内容
+      - name: 拉取GHCR多架构镜像并推送至Docker Hub
+        run: |
+          VERSION=${{ needs.Prepare.outputs.app_version }}
+          GHCR_IMAGE=ghcr.io/cnk3x/xunlei:$VERSION
+          ACR_IMAGE=registry.cn-shenzhen.aliyuncs.com/cnk3x/xunlei:$VERSION
+          # 核心命令：创建多架构镜像标签并推送
+          docker buildx imagetools create -t $ACR_IMAGE $GHCR_IMAGE
+          echo "验证阿里云多架构镜像清单："
+          docker buildx imagetools inspect $ACR_IMAGE
+          echo "成功将多架构镜像推送至阿里云：$ACR_IMAGE"
