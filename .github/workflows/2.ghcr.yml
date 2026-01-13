@@ -1,4 +1,4 @@
-name: GhcrBuild
+name: 2.GhcrBuild
 
 on:
   workflow_dispatch:
