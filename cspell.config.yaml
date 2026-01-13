@@ -11,9 +11,11 @@ words:
   - breaked
   - buildx
   - Cloneflags
+  - devtmpfs
   - dockerenv
   - envconfig
   - errgroup
+  - Fstype
   - geminilake
   - GITTAG
   - GOARCH
@@ -25,6 +27,8 @@ words:
   - kubespider
   - ldflags
   - localtime
+  - logfile
+  - logsize
   - Mkdirs
   - modtime
   - mountinfo
@@ -50,11 +54,14 @@ words:
   - synoman
   - SYNOPKG
   - SYNOPLATFORM
+  - sysfs
   - TARGETARCH
   - testdata
+  - tmpfs
   - trimpath
   - tzdata
   - ulikunitz
+  - undos
   - wcgi
   - webman
   - webp

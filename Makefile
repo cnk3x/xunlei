@@ -8,7 +8,7 @@ https_proxy := http://host.docker.internal:7890
 
 GoBuild := CGO_ENABLED=0 GOOS=linux go build -v -ldflags '-s -w'
 DProxy := --build-arg http_proxy=$(http_proxy) --build-arg https_proxy=$(https_proxy)
-DBuildBase := docker buildx build $(DProxy)
+DBuildBase := docker buildx build
 DBuild := $(DBuildBase) --push --platform linux/amd64,linux/arm64
 
 VERSION := $(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')

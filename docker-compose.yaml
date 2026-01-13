@@ -1,30 +1,29 @@
 # 该示例为作者本人在飞牛NAS的配置
 services:
-    xlp:
-        container_name: xlp
-        image: cnk3x/xunlei:3.21
-        restart: unless-stopped
-        command: ["/xlp"]
+  xlp:
+    container_name: xlp
+    image: cnk3x/xunlei:3.21
+    restart: unless-stopped
 
-        # 宿主机名，迅雷远程控制的名称与此相关，一般是 `群晖-${hostname}`
-        hostname: fn01
-        # 必须, cap_add: [SYS_ADMIN] 和 privileged: true 二选一
-        cap_add: [SYS_ADMIN]
-        ports: [2345:2345] # 面板访问端口，如需更改，替换前面的2345即可
-        environment:
-            # 如果需要指定多个下载目录，手动指定XL_DIR_DOWNLOAD
-            # 多个以冒号`:`隔开，都必须以 /xunlei 开头，迅雷面板选择保存路径显示会去掉/xunlei前缀
-            # 指定后可以在 volumes 中绑定宿主机实际目录
-            # 迅雷云盘的缓存会使用第一个目录会缓存
-            # /xunlei/后面可以用中文
-            # 不设置默认一个目录 /xunlei/downloads
-            - XL_DIR_DOWNLOAD=/xunlei/下载:/xunlei/影音:/xunlei/大人
-        volumes:
-            # 对应 XL_DIR_DOWNLOAD 指定的目录, 请替换冒号前面的路径为实际路径
-            - /vol1/1000/下载:/xunlei/下载
-            - /vol1/1000/影音/下载:/xunlei/影音
-            - /vol1/1000/大人/下载:/xunlei/大人
-            # 数据目录，必须，迅雷运行时，插件，升级，包括登录数据都在这
-            - ./data:/xunlei/data
-            # 可选，不配置每次启动都会从远程下载spk
-            - ./cache:/xunlei/var/packages/pan-xunlei-com
+    # 宿主机名，迅雷远程控制的名称与此相关，一般是 `群晖-${hostname}`
+    hostname: fn01
+    # 必须, cap_add: [SYS_ADMIN] 和 privileged: true 二选一
+    cap_add: [SYS_ADMIN]
+    ports: [2345:2345] # 面板访问端口，如需更改，替换前面的2345即可
+    environment:
+      # 如果需要指定多个下载目录，手动指定XL_DIR_DOWNLOAD
+      # 多个以冒号`:`隔开，都必须以 /xunlei 开头，迅雷面板选择保存路径显示会去掉/xunlei前缀
+      # 指定后可以在 volumes 中绑定宿主机实际目录
+      # 迅雷云盘的缓存会使用第一个目录会缓存
+      # /xunlei/后面可以用中文
+      # 不设置默认一个目录 /xunlei/downloads
+      - XL_DIR_DOWNLOAD=/xunlei/下载:/xunlei/影音:/xunlei/大人
+    volumes:
+      # 对应 XL_DIR_DOWNLOAD 指定的目录, 请替换冒号前面的路径为实际路径
+      - /vol1/1000/下载:/xunlei/下载
+      - /vol1/1000/影音/下载:/xunlei/影音
+      - /vol1/1000/大人/下载:/xunlei/大人
+      # 数据目录，必须，迅雷运行时，插件，升级，包括登录数据都在这
+      - ./data:/xunlei/data
+      # 可选，不配置每次启动都会从远程下载spk
+      - ./cache:/xunlei/var/packages/pan-xunlei-com

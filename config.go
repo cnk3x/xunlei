@@ -28,6 +28,8 @@ type Config struct {
 	Chroot        string   //CHROOT主目录, 指定该值则以chroot模式运行, 这用于在容器内隔离环境
 	SpkUrl        string   //
 	ForceDownload bool     //是否强制下载
+
+	LauncherLogFile string
 }
 
 // 默认配置端口2345，下载保存文件夹 /xunlei/downloads, 数据文件夹 /xunlei/data
@@ -53,6 +55,8 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK_URL")
 	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
+
+	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志")
 
 	if err = flags.Parse(); err != nil {
 		return

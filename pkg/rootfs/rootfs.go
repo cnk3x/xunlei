@@ -57,7 +57,7 @@ type LinkOptions struct {
 func Run(ctx context.Context, newRoot string, run func(ctx context.Context) error, options ...Option) (err error) {
 	ctx = log.Prefix(ctx, "boot")
 
-	slog.InfoContext(ctx, "start install")
+	slog.InfoContext(ctx, "start boot")
 
 	defer func() {
 		if errors.Is(err, context.Canceled) {
@@ -146,40 +146,26 @@ func chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 	}
 
 	defer func() {
-		if e := syscall.Close(rfd); e != nil {
-			slog.WarnContext(ctx, "closeFd", "fd", rfd, "err", err)
-		}
+		logWithErr(ctx, syscall.Close(rfd), "closeFd", "fd", rfd)
 	}()
 
-	slog.DebugContext(ctx, "chroot", "root", newRoot)
-	if err = syscall.Chdir(newRoot); err != nil {
+	if err = logWithErr(ctx, syscall.Chdir(newRoot), "chdir", "dir", newRoot); err != nil {
 		return
 	}
 
-	if err = syscall.Chroot("."); err != nil {
-		return
-	}
-
-	if err = syscall.Chdir("/"); err != nil {
+	if err = logWithErr(ctx, syscall.Chroot("."), "chroot", "path", "."); err != nil {
 		return
 	}
 
 	defer func() {
-		if e := syscall.Fchdir(rfd); e != nil {
-			slog.WarnContext(ctx, "fchdir", "fd", rfd, "err", e)
-		}
-
-		if e := syscall.Chroot("."); e != nil {
-			slog.WarnContext(ctx, "chroot rollback", "path", "/", "err", e)
-		} else {
-			slog.DebugContext(ctx, "chroot rollback", "path", wd)
-		}
-
-		if e := syscall.Chdir(wd); e != nil {
-			slog.WarnContext(ctx, "chdir", "wd", wd, "err", e)
-			return
-		}
+		logWithErr(ctx, syscall.Fchdir(rfd), "fchdir", "fd", rfd)
+		logWithErr(ctx, syscall.Chroot("."), "chroot rollback", "path", ".")
+		logWithErr(ctx, syscall.Chdir(wd), "chdir", "dir", wd)
 	}()
+
+	if err = logWithErr(ctx, syscall.Chdir("/"), "chdir", "dir", "/"); err != nil {
+		return
+	}
 
 	//run
 	err = run(ctx)
@@ -231,9 +217,9 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode, existsOk bool) (un
 				undos = append(undos, func() { logWithErr(ctx, os.Remove(full), "rmdir", "path", full) })
 			}
 		case !stat.IsDir():
-			err = fmt.Errorf("mkdir fial, parent is not a directoy: %w: %s", fs.ErrExist, full)
+			err = fmt.Errorf("mkdir fail, parent is not a directory: %w: %s", fs.ErrExist, full)
 		case !existsOk:
-			err = fmt.Errorf("mkdir fial, parent is exists: %w: %s", fs.ErrExist, full)
+			err = fmt.Errorf("mkdir fail, parent is exists: %w: %s", fs.ErrExist, full)
 		}
 
 		if err != nil {
@@ -370,12 +356,12 @@ func execUndo(undo Undo, err *error) {
 	}
 }
 
-func makeUndos(undes *[]Undo) (undo Undo) {
+func makeUndos(undos *[]Undo) (undo Undo) {
 	return func() {
-		if undes == nil || len(*undes) == 0 {
+		if undos == nil || len(*undos) == 0 {
 			return
 		}
-		for _, undo := range slices.Backward(*undes) {
+		for _, undo := range slices.Backward(*undos) {
 			if undo != nil {
 				undo()
 			}
@@ -383,7 +369,7 @@ func makeUndos(undes *[]Undo) (undo Undo) {
 	}
 }
 
-func logWithErr(ctx context.Context, err error, msg string, args ...any) {
+func logWithErr(ctx context.Context, err error, msg string, args ...any) error {
 	switch {
 	case errors.Is(err, syscall.ENOTEMPTY):
 		slog.Log(ctx, slog.LevelDebug, msg, append(args, "err", "skip because not empty")...)
@@ -394,4 +380,5 @@ func logWithErr(ctx context.Context, err error, msg string, args ...any) {
 	default:
 		slog.Log(ctx, slog.LevelDebug, msg, args...)
 	}
+	return err
 }

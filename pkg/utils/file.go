@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"cmp"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,39 +50,13 @@ func Cat(fn string, noTrim ...bool) string {
 	return string(d)
 }
 
-// 脱了裤子放个屁，为了能够方便回滚
-func Mkdir(dir string, perm fs.FileMode, existsOk bool) (created []string, err error) {
-	if dir, err = filepath.Abs(dir); err != nil {
-		return
-	}
+func PathExists(fn string) bool { return Eol(os.Stat(fn)) == nil }
 
-	vol := filepath.VolumeName(dir)
-	if vol != "" {
-		dir = dir[len(vol):]
-	}
-	dir = strings.Trim(dir, string(filepath.Separator))
-
-	fields := strings.FieldsFunc(dir, func(r rune) bool { return r == filepath.Separator })
-	for i := range fields {
-		full := filepath.Join(cmp.Or(vol, string(filepath.Separator)), filepath.Join(fields[:i+1]...))
-		switch stat, e := os.Stat(full); {
-		case e != nil && !os.IsNotExist(e):
-			err = e
-		case e != nil:
-			if err = os.Mkdir(full, perm); err != nil {
-				err = fmt.Errorf("mkdir fail: %w: %s", err, full)
-			}
-			created = append(created, full)
-		case !stat.IsDir():
-			err = fmt.Errorf("mkdir fail, parent is not a directory: %w: %s", fs.ErrExist, full)
-		case !existsOk:
-			err = fmt.Errorf("mkdir fail, parent is exists: %w: %s", fs.ErrExist, full)
-		}
-
-		if err != nil {
-			return
+func Cats(fns ...string) string {
+	for _, fn := range fns {
+		if s := Cat(fn); s != "" {
+			return s
 		}
 	}
-
-	return
+	return ""
 }
