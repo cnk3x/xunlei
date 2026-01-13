@@ -8,8 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 下载产物
-        uses: actions/download-artifact@v7
-        with: { name: artifacts, path: ./artifacts/ }
+        uses: dawidd6/action-download-artifact@v12
+        with:
+          name: artifacts
+          path: ./artifacts/
+          workflow: 1.prepare.yml
+          github_token: ${{secrets.GH_TOKEN}}
 
       - name: 整理构建
         id: prepare

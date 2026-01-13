@@ -8,8 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 获取版本
-        uses: actions/download-artifact@v7
-        with: { name: version, path: ./artifacts/version }
+        uses: dawidd6/action-download-artifact@v12
+        with:
+          name: version
+          path: ./artifacts/version
+          workflow: 1.prepare.yml
+          github_token: ${{secrets.GH_TOKEN}}
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
