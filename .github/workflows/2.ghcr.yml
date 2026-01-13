@@ -23,7 +23,7 @@ jobs:
           ls -lh ./artifacts
           VERSION=$(cat ./artifacts/version)
           echo $VERSION
-          echo $VERSION >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
