@@ -11,7 +11,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v12
         with:
           name: version
-          path: ./artifacts/version
+          path: ./artifacts/
           workflow: 1.prepare.yml
           github_token: ${{secrets.GH_TOKEN}}
 
