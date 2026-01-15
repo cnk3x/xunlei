@@ -16,7 +16,7 @@ import (
 )
 
 // Extract 从迅雷SPK中提取需要的文件(存在则跳过)
-func Extract(ctx context.Context, src io.Reader, dstDir string, overwrite bool) (err error) {
+func Extract(ctx context.Context, src io.Reader, dstDir string) (err error) {
 	return Walk(ctx, src, func(tr io.Reader, h *tar.Header) (err error) {
 		if h.Name == "package.tgz" {
 			err = cmp.Or(Walk(ctx, tr, func(tr io.Reader, h *tar.Header) (err error) {
@@ -25,26 +25,20 @@ func Extract(ctx context.Context, src io.Reader, dstDir string, overwrite bool) 
 				case strings.HasPrefix(h.Name, "bin/bin/version"):
 					perm = 0o666
 				case strings.HasPrefix(h.Name, "bin/bin/xunlei-pan-cli"):
-					perm = fs.ModePerm
+					perm = 0o777
 				case h.Name == "ui/index.cgi":
-					perm = fs.ModePerm
+					perm = 0o777
 				default:
 					return
 				}
 
 				err = func() (err error) {
 					target := filepath.Join(dstDir, h.Name)
-					if err = os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+					if err = os.MkdirAll(filepath.Dir(target), 0o777); err != nil {
 						return
 					}
 
-					flag := os.O_RDWR | os.O_CREATE
-					if overwrite {
-						flag |= os.O_TRUNC
-					} else {
-						flag |= os.O_EXCL
-					}
-					f, e := os.OpenFile(target, flag, perm)
+					f, e := os.OpenFile(target, os.O_RDWR|os.O_CREATE|os.O_TRUNC, perm)
 					if e != nil {
 						if !os.IsExist(e) {
 							err = e

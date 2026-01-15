@@ -46,10 +46,13 @@ wsl::
 	GOARCH=amd64 $(GoBuild) -v -o /usr/local/bin/xlp ./cmd/xlp
 
 home:: amd64
-	docker buildx build --push -t $(HOME_REPO)$(NAME):$(VERSION) .
+	$(DBuildBase) --push -t $(HOME_REPO)$(NAME):$(VERSION) .
 
 load:: amd64
-	docker buildx build --load -t $(NAME):$(VERSION) .
+	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME):$(VERSION) .
 
-ubuntu::
-	$(DBuildBase) --load -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .
+ubuntu:: amd64
+	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .
+
+debian:: amd64
+	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME)-debian:$(VERSION) -f debian.Dockerfile .

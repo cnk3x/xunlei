@@ -47,7 +47,8 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("force_download: %t", cfg.ForceDownload))
 
 	if err := spk.Download(ctx, cfg.SpkUrl, filepath.Join(cfg.Chroot, xunlei.SYNOPKG_PKGDEST), cfg.ForceDownload); err != nil {
-		return
+		slog.ErrorContext(ctx, "exit", "err", err)
+		os.Exit(1)
 	}
 
 	if spkVer := utils.Cat(filepath.Join(cfg.Chroot, xunlei.PAN_XUNLEI_VER)); spkVer != "" {
@@ -58,21 +59,14 @@ func main() {
 		slog.InfoContext(ctx, fmt.Sprintf(`xunlei version: %s`, cliVer))
 	}
 
-	err := rootfs.Run(ctx,
-		cfg.Chroot,
-		xunlei.NewRun(cfg),
-		rootfs.Before(xunlei.BeforeChroot(cfg)),
+	if err := rootfs.Run(
+		log.Prefix(ctx, "boot"),
+		cfg.Chroot, xunlei.NewRun(cfg),
 		rootfs.Basic,
-		rootfs.MountBindRoot("/lib", cfg.Chroot),
-		rootfs.MountBindRoot("/usr/lib", cfg.Chroot),
-		rootfs.MountBindRoot("/lib64", cfg.Chroot, rootfs.Optional()),
-		rootfs.MountBindRoot("/usr/lib64", cfg.Chroot, rootfs.Optional()),
-		rootfs.MountBindRoot("/etc/ssl", cfg.Chroot, rootfs.Optional()),
-		rootfs.LinkRoot("/etc/timezone", cfg.Chroot, 0666, true),
-		rootfs.LinkRoot("/etc/resolv.conf", cfg.Chroot, 0666, true),
-	)
-
-	if err != nil {
+		rootfs.Before(xunlei.BeforeChroot(cfg)),
+		rootfs.Binds(cfg.Chroot, "/lib", "/lib64", "/usr", "/sbin", "/bin", "/etc/ssl"),
+		rootfs.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf", "/etc/passwd", "/etc/group", "/etc/shadow"),
+	); err != nil {
 		slog.ErrorContext(ctx, "exit", "err", err)
 		os.Exit(1)
 	}

@@ -52,7 +52,7 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.Gid, "gid", "g", "运行迅雷的用户组ID", "XL_GID", "GID")
 	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
 	flags.Var(&cfg.Chroot, "chroot", "r", "CHROOT主目录", "XL_CHROOT")
-	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK_URL")
+	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
 	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 

@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-func HumanBytes[T uintT | intT](n T, prec ...int) string {
+func HumanBytes[T UintT | IntT](n T, prec ...int) string {
 	if f := float64(n); f >= 1024 {
 		for i, u := range slices.Backward([]rune("KMGTE")) {
 			if base := float64(int64(1) << (10 * (i + 1))); float64(n) >= base {

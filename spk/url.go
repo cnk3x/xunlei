@@ -2,6 +2,7 @@ package spk
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -37,15 +38,15 @@ func Download(ctx context.Context, spkUrl string, dir string, force bool) (err e
 }
 
 func download_file(ctx context.Context, spkUrl string, dir string) (err error) {
+	spkUrl = strings.TrimPrefix(spkUrl, "file://")
 	slog.InfoContext(ctx, "download spk file", "url", spkUrl)
-	spkUrl = strings.TrimSuffix(spkUrl, "file://")
 	f, e := os.Open(spkUrl)
 	if err = e; err != nil {
 		return
 	}
 	defer f.Close()
 
-	err = Extract(ctx, f, dir, true)
+	err = Extract(ctx, f, dir)
 	return
 }
 
@@ -55,17 +56,23 @@ func download_http(ctx context.Context, spkUrl string, dir string) (err error) {
 	if req, err = http.NewRequestWithContext(ctx, http.MethodGet, spkUrl, nil); err != nil {
 		return
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,zh-TW;q=0.5")
+	req.Header.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("accept-encoding", "gzip, deflate, br, zstd")
+	req.Header.Set("accept-language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6,zh-TW;q=0.5")
+	req.Header.Set("cache-control", "no-cache")
+	req.Header.Set("dnt", "1")
+	req.Header.Set("pragma", "no-cache")
+	req.Header.Set("priority", "u=0, i")
+	req.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
 
+	cli := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	var resp *http.Response
-	if resp, err = http.DefaultClient.Do(req); err != nil {
+	if resp, err = cli.Do(req); err != nil {
 		return
 	}
 	defer resp.Body.Close()
 
-	err = Extract(ctx, resp.Body, dir, true)
+	err = Extract(ctx, resp.Body, dir)
 	return
 }
 

@@ -1,11 +1,10 @@
 package utils
 
 import (
-	"reflect"
 	"time"
 )
 
-// SelectOnce select `cSelect` chan, return it
+// SelectOnce select `cSelect` chan, return it (blocked)
 //
 //	v: if recv from cSelect
 //	ok: if cSelect is not closed
@@ -16,31 +15,89 @@ import (
 //	select{
 //		 case <- cBreaks[...]:
 //			v = nil, ok = false, breaked = true
-//		 case v, ok:= cSeelct:
+//		 case v, ok:= cSelect:
 //			v = v, ok = ok, breaked = false
 //	}
-func SelectOnce[T any](cSelect <-chan T, cBreaks ...<-chan struct{}) (v T, ok, breaked bool) {
-	c2case := func(c <-chan struct{}, _ int) reflect.SelectCase {
-		return reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(c)}
+func CSelect[T any](cSelect <-chan T, cBreaks ...<-chan struct{}) (v T, ok, breaked bool) {
+	cBreaked := make(chan struct{})
+
+	for _, c := range cBreaks {
+		go func() {
+			select {
+			case <-cBreaked:
+			case <-c:
+				close(cBreaked)
+			}
+		}()
 	}
-	cases := append(Map(cBreaks, c2case), reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(cSelect)})
-	if chosen, x, ok := reflect.Select(cases); chosen == len(cases)-1 {
-		v, _ = x.Interface().(T)
-		return v, ok, false
+
+	select {
+	case <-cBreaked:
+		breaked = true
+	case v, ok = <-cSelect:
+		close(cBreaked)
 	}
-	return v, false, true
+	return
 }
 
-// SelectDo do if recv from sSelect
-func SelectDo[T any](cSelect <-chan T, okFunc func(), cBreaks ...<-chan struct{}) {
-	if _, _, breaked := SelectOnce(cSelect, cBreaks...); !breaked {
-		okFunc()
+// SelectDo do if recv from sSelect (blocked)
+func SelectDo[T any](cSelect <-chan T, f func(T, bool), cBreaks ...<-chan struct{}) (breaked bool) {
+	cBreaked := make(chan struct{})
+
+	for _, c := range cBreaks {
+		go func() {
+			select {
+			case <-cBreaked:
+			case <-c:
+				close(cBreaked)
+			}
+		}()
+	}
+
+	select {
+	case <-cBreaked:
+		return true
+	case v, ok := <-cSelect:
+		close(cBreaked)
+		f(v, ok)
+		return false
 	}
 }
 
+// Sleep breakable sleep (blocked)
 func Sleep(d time.Duration, cBreaks ...<-chan struct{}) (breaked bool) {
 	t := time.NewTimer(d)
 	defer t.Stop()
-	_, _, breaked = SelectOnce(t.C, cBreaks...)
+	_, _, breaked = CSelect(t.C, cBreaks...)
 	return
+}
+
+// After do when done is closed (unblocked)
+func After[T any, F ft[T]](done <-chan T, f F, cBreaks ...<-chan struct{}) {
+	go SelectDo(done, func(t T, ok bool) {
+		af := any(f)
+		if ft, ok := af.(func()); ok {
+			ft()
+			return
+		}
+
+		if ft, ok := af.(func() error); ok {
+			_ = ft()
+			return
+		}
+
+		if ft, ok := af.(func(T)); ok {
+			ft(t)
+			return
+		}
+
+		if ft, ok := af.(func(T) error); ok {
+			_ = ft(t)
+			return
+		}
+	}, cBreaks...)
+}
+
+type ft[T any] interface {
+	~func() | ~func() error | ~func(T) | ~func(T) error
 }

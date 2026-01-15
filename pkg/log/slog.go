@@ -38,6 +38,15 @@ func Prefix(ctx context.Context, prefix string) context.Context {
 	return context.WithValue(ctx, ctxPrefixKey, prefix)
 }
 
+func PrefixAttr(prefix string) slog.Attr { return slog.String(prefixKey, prefix) }
+
+func GetPrefix(ctx context.Context) slog.Attr {
+	if v := ctx.Value(ctxPrefixKey); v != nil {
+		return slog.String(prefixKey, v.(string))
+	}
+	return slog.Attr{}
+}
+
 var (
 	defaultLevel      = slog.LevelInfo
 	defaultTimeFormat = "01/02 15:04:05"

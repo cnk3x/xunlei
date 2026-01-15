@@ -2,15 +2,15 @@ package utils
 
 import "strconv"
 
-type uintT interface {
+type UintT interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
 }
 
-type intT interface {
+type IntT interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 
-func StrParser[R uintT | intT, T1, T2 any, R64 uint64 | int64](f func(string, T1, T2) (R64, error), t1 T1, t2 T2) func(string) (R, error) {
+func StrParser[R UintT | IntT, T1, T2 any, R64 uint64 | int64](f func(string, T1, T2) (R64, error), t1 T1, t2 T2) func(string) (R, error) {
 	return func(s string) (R, error) {
 		r, err := f(s, t1, t2)
 		if err != nil {
@@ -32,3 +32,7 @@ var (
 	ParseInt32  = StrParser[int32](strconv.ParseInt, 0, 32)
 	ParseInt64  = StrParser[int64](strconv.ParseInt, 0, 64)
 )
+
+func String[T IntT | UintT](v T) string {
+	return strconv.FormatInt(int64(v), 10)
+}

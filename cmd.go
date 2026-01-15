@@ -1,7 +1,6 @@
 package xunlei
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"log/slog"
@@ -11,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/log"
+	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
 func cmdRun(ctx context.Context, name string, args []string, dir string, env []string, uid, gid uint32) (err error) {
@@ -40,45 +40,39 @@ func wrapConsole(ctx context.Context) io.WriteCloser {
 	lv := slog.LevelDebug
 	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
 	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
-	r, w := io.Pipe()
-	go func() {
-		for scan := bufio.NewScanner(r); scan.Scan(); {
-			s := scan.Text()
 
-			if strings.Contains(s, `filter not match`) {
-				continue
-			}
-
-			if strings.Contains(s, `DetectPlatform err:`) {
-				continue
-			}
-
-			if strings.Contains(s, `detect err:key file lost`) {
-				continue
-			}
-
-			switch {
-			case strings.HasPrefix(s, "panic:"):
-				lv = slog.LevelError
-			case strings.HasPrefix(s, "RunSafe panic:"):
-				lv = slog.LevelError
-			case re0.MatchString(s):
-				m := re0.FindStringSubmatch(s)
-				if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
-					lv = slog.LevelDebug
-				}
-				s = s[len(m[0]):]
-			case re1.MatchString(s):
-				m := re0.FindStringSubmatch(s)
-				if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
-					lv = slog.LevelDebug
-				}
-				s = s[len(m[0]):]
-			}
-			s = strings.ReplaceAll(s, `\u0000`, "")
-			slog.Log(ctx, lv, s)
+	return utils.LineWriter(func(s string) {
+		if strings.Contains(s, `filter not match`) {
+			return
 		}
-	}()
 
-	return w
+		if strings.Contains(s, `DetectPlatform err:`) {
+			return
+		}
+
+		if strings.Contains(s, `detect err:key file lost`) {
+			return
+		}
+
+		switch {
+		case strings.HasPrefix(s, "panic:"):
+			lv = slog.LevelError
+		case strings.HasPrefix(s, "RunSafe panic:"):
+			lv = slog.LevelError
+		case re0.MatchString(s):
+			m := re0.FindStringSubmatch(s)
+			if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
+				lv = slog.LevelDebug
+			}
+			s = s[len(m[0]):]
+		case re1.MatchString(s):
+			m := re0.FindStringSubmatch(s)
+			if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
+				lv = slog.LevelDebug
+			}
+			s = s[len(m[0]):]
+		}
+		s = strings.ReplaceAll(s, `\u0000`, "")
+		slog.Log(ctx, lv, s)
+	})
 }

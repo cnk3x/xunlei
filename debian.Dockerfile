@@ -1,4 +1,4 @@
-FROM ubuntu:jammy
+FROM debian:stable-slim
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.authors=cnk3x

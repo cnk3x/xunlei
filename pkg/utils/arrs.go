@@ -1,6 +1,12 @@
 package utils
 
-import "cmp"
+import (
+	"bufio"
+	"cmp"
+	"io"
+	"iter"
+	"log"
+)
 
 func CompactUniq[Slice ~[]T, T comparable](s Slice, inplace ...bool) Slice {
 	result := s
@@ -54,3 +60,43 @@ func Flat[T any](s [][]T) []T {
 	l := Reduce(s, func(agg int, item []T, _ int) int { return agg + len(item) }, 0)
 	return Reduce(s, func(agg []T, item []T, _ int) []T { return append(agg, item...) }, make([]T, 0, l))
 }
+
+func ReduceSeq2[T, R any](seq iter.Seq2[int, T], walk func(agg R, item T, index int) R, init R) R {
+	for i, item := range seq {
+		init = walk(init, item, i)
+	}
+	return init
+}
+
+func ReduceSeq[T, R any](seq iter.Seq[T], walk func(agg R, item T) R, init R) R {
+	for item := range seq {
+		init = walk(init, item)
+	}
+	return init
+}
+
+func LineSeq(r io.Reader) iter.Seq[string] {
+	return func(yield func(string) bool) {
+		for scan := bufio.NewScanner(r); scan.Scan(); {
+			if !yield(scan.Text()) {
+				break
+			}
+		}
+	}
+}
+
+func LineWalk(r io.Reader, f func(s string)) {
+	for scan := bufio.NewScanner(r); scan.Scan(); {
+		f(scan.Text())
+	}
+}
+
+func LineWriter(lineRead func(line string)) io.WriteCloser {
+	r, w := io.Pipe()
+	go LineWalk(r, lineRead)
+	return w
+}
+
+func LogStd(w io.Writer) *log.Logger { return log.New(w, "", 0) }
+
+func Array[T any](s ...T) []T { return s }

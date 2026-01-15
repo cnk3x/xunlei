@@ -3,13 +3,10 @@ package log
 import (
 	"context"
 	"io"
-	"log"
 	"log/slog"
 	"runtime"
 	"time"
 )
-
-func Std(w io.Writer, prefix string) *log.Logger { return log.New(w, prefix, 0) }
 
 func Writer(ctx context.Context) io.Writer {
 	return &stdWriter{ctx: ctx, h: slog.Default().Handler()}

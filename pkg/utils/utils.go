@@ -9,10 +9,6 @@ func Iif[T any](c bool, t, f T) T {
 	return f
 }
 
-func Eol[T any](_ T, err error) error { return err }
-
-func Eon[T any, E any](v T, _ E) T { return v }
-
 func First[T any](v []T) T { return FirstOr(v) }
 func FirstOr[T any](v []T, def ...T) T {
 	if len(v) > 0 {
@@ -31,3 +27,6 @@ func HasPrefix(s, prefix string, ignoreCase ...bool) bool {
 	}
 	return strings.HasPrefix(s, prefix)
 }
+
+func Eol[T any](_ T, err error) error { return err }
+func Eon[T any, E any](v T, _ E) T    { return v }

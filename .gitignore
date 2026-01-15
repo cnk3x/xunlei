@@ -11,3 +11,4 @@ home.repo
 testdata/
 /amd64/
 artifacts/
+/lib
