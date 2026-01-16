@@ -1,0 +1,85 @@
+name: build
+
+on:
+  workflow_dispatch:
+  tags:
+    - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+        with: { repository: cnk3x/xunlei, ref: "${{ github.ref }}" }
+
+      - name: 配置环境
+        uses: actions/setup-go@v6
+        with: { go-version: "stable" }
+
+      - name: 编译程序
+        run: |
+          GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
+          GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
+          ls -lh ./artifacts
+        env: { CGO_ENABLED: 0, GOOS: linux }
+
+      - name: 设置版本
+        id: get_version
+        run: |
+          VERSION=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
+          if [ -z "$VERSION" ]; then
+            echo "错误：未能从xlp.go中提取到版本号"
+            exit 1
+          fi
+          echo "version=$VERSION" > $GITHUB_OUTPUT
+          echo "版本号：$VERSION"
+
+      - name: 设置QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GH_TOKEN }}"
+
+      - name: 登录DCR
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DCR_USER }}
+          password: ${{ secrets.DCR_TOKEN }}
+
+      - name: 构建推送
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/cnk3x/xunlei:${{ steps.prepare.outputs.version }}
+            cnk3x/xunlei:${{ steps.prepare.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 整理产物
+        run: |
+          cd ./artifacts
+          mv xlp-amd64 xlp
+          tar -zcvf xlp-amd64.tar.gz xlp
+          mv xlp-arm64 xlp
+          tar -zcvf xlp-arm64.tar.gz xlp
+          ls -lh *.tar.gz
+
+      - name: 发布上传
+        uses: softprops/action-gh-release@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}" }
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: v${{ steps.get_version.outputs.version }}
+          files: |
+            ./artifacts/xlp-amd64.tar.gz
+            ./artifacts/xlp-arm64.tar.gz

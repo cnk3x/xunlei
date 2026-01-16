@@ -62,8 +62,8 @@ func main() {
 	if err := rootfs.Run(
 		log.Prefix(ctx, "boot"),
 		cfg.Chroot, xunlei.NewRun(cfg),
+		rootfs.Before(xunlei.NewBefore(cfg)),
 		rootfs.Basic,
-		rootfs.Before(xunlei.BeforeChroot(cfg)),
 		rootfs.Binds(cfg.Chroot, "/lib", "/lib64", "/usr", "/sbin", "/bin", "/etc/ssl"),
 		rootfs.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf", "/etc/passwd", "/etc/group", "/etc/shadow"),
 	); err != nil {

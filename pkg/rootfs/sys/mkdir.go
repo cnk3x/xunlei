@@ -3,12 +3,14 @@ package sys
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func Mkdirs(ctx context.Context, dirs []string, perm fs.FileMode) (undo Undo, err error) {
@@ -44,8 +46,8 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 	case ok:
 		undos = append(undos, newRm(ctx, dir, "rmdir"))
 		slog.DebugContext(ctx, "mkdir done", "dir", dir)
-		// default:
-		// 	slog.DebugContext(ctx, "mkdir skip", "dir", dir)
+	default:
+		slog.DebugContext(ctx, "mkdir skip", "dir", dir, "cause", "directory exists")
 	}
 
 	return
@@ -53,12 +55,14 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 
 func newRm(ctx context.Context, target, act string) func() {
 	return func() {
-		err := os.Remove(target)
-		if err != nil {
-			slog.LogAttrs(ctx, slog.LevelWarn, act, slog.String("target", target), slog.String("err", err.Error()))
-			return
+		switch err := os.Remove(target); {
+		case errors.Is(err, syscall.ENOTEMPTY): //目录非空
+			slog.LogAttrs(ctx, slog.LevelWarn, act+" skip", slog.String("target", target), slog.String("err", err.Error()))
+		case err != nil:
+			slog.LogAttrs(ctx, slog.LevelWarn, act+" fail", slog.String("target", target), slog.String("err", err.Error()))
+		default:
+			slog.LogAttrs(ctx, slog.LevelDebug, act+" done", slog.String("target", target))
 		}
-		slog.LogAttrs(ctx, slog.LevelDebug, act, slog.String("target", target))
 	}
 }
 

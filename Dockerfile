@@ -1,15 +1,9 @@
-FROM debian:stable-slim
+FROM ubuntu:jammy
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt update
 RUN apt install --no-install-recommends -y ca-certificates tzdata curl wget xz-utils
-
-# ENV spk=/tmp/xl.spk spk_tmp=/tmp/xl-tmp rootfs=/rootfs
-# RUN mkdir -p ${spk_tmp} ${rootfs}/etc/ssl/certs
-# RUN wget -O ${spk} "https://down.sandai.net/nas/nasxunlei-DSM7-$([ "${TARGETARCH}" = "arm64" ] && echo x86_64 || echo armv8).spk"
-# RUN tar -xvOf ${spk} package.tgz | tar -xvJC ${spk_tmp} ui/index.cgi bin
-# RUN ldd ${spk_tmp}/ui/index.cgi ${spk_tmp}/bin/bin/xunlei-pan-cli* 2>/dev/null | grep '=>' | awk '{printf "cp %s /rootfs/lib/%s;\n", $3, $1}' | sh
 
 ENV rootfs=/rootfs
 RUN mkdir -p ${rootfs}/etc/ssl/certs ${rootfs}/lib
@@ -20,7 +14,8 @@ RUN echo "Asia/Chongqing" >${rootfs}/etc/timezone
 RUN cp -Lr --parents /etc/ssl/certs/ca-certificates.crt ${rootfs}/
 
 COPY artifacts/xlp-${TARGETARCH} /rootfs/xlp
-RUN chmod +x /rootfs/xlp
+COPY xlp.sh /rootfs/xlp.sh
+RUN chmod +x /rootfs/xlp /rootfs/xlp.sh
 
 FROM busybox:latest
 ARG TARGETARCH
@@ -41,10 +36,10 @@ ENV XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_USERNAME= \
   XL_DIR_DOWNLOAD=/xunlei/downloads \
   XL_PREVENT_UPDATE= \
-  XL_SPK_URL= \
   XL_UID= \
   XL_GID= \
-  XL_DEBUG=
+  XL_DEBUG= \
+  XL_SPK_URL=
 
 VOLUME [ "/xunlei/data", "/xunlei/var/packages/pan-xunlei-com" ]
 EXPOSE 2345

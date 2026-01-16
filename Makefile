@@ -49,10 +49,13 @@ home:: amd64
 	$(DBuildBase) --push -t $(HOME_REPO)$(NAME):$(VERSION) .
 
 load:: amd64
-	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME):$(VERSION) .
+	$(DBuildBase) --load -t $(NAME):$(VERSION) .
 
 ubuntu:: amd64
-	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .
+	$(DBuildBase) --load -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .
 
 debian:: amd64
-	$(DBuildBase) --load --platform linux/amd64,linux/arm64 -t $(NAME)-debian:$(VERSION) -f debian.Dockerfile .
+	$(DBuildBase) --load -t $(NAME)-debian:$(VERSION) -f debian.Dockerfile .
+
+test:: build
+	$(DBuild) -t $(GHCR)$(NAME):test .

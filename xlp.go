@@ -10,11 +10,13 @@ import (
 	"net/http/cgi"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
 
 	"github.com/cnk3x/xunlei/embed/authenticate_cgi"
+	"github.com/cnk3x/xunlei/pkg/cmdx"
 	"github.com/cnk3x/xunlei/pkg/fo"
 	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/utils"
@@ -57,8 +59,10 @@ func NewRun(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) error { return Run(ctx, cfg) }
 }
 
-func BeforeChroot(cfg Config) func(ctx context.Context) error {
+func NewBefore(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
+		_ = cmdx.ShellFile(ctx, utils.Eon(os.Executable())+".sh")
+
 		libDir := filepath.Join(cfg.Chroot, "lib")
 		for _, dir := range append(cfg.DirDownload, cfg.DirData, filepath.Join(cfg.Chroot, VAR_DIR), libDir) {
 			err = os.MkdirAll(dir, 0777)
@@ -144,7 +148,15 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		args = append(args, "-logfile", cfg.LauncherLogFile)
 	}
 
-	return cmdRun(log.Prefix(ctx, "pan"), PAN_XUNLEI_CLI, args, SYNOPKG_PKGDEST+"/bin", envs, cfg.Uid, cfg.Gid)
+	return cmdx.Exec(
+		log.Prefix(ctx, "pan"),
+		PAN_XUNLEI_CLI,
+		cmdx.Args(args...),
+		cmdx.Dir(SYNOPKG_PKGDEST+"/bin"),
+		cmdx.Env(envs),
+		cmdx.Credential(cfg.Uid, cfg.Gid),
+		cmdx.LineRead(readConsole(ctx)),
+	)
 }
 
 func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan struct{}, err error) {
@@ -152,7 +164,7 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 	mux := web.NewMux()
 	mux.UseRecoverer()
 
-	console := wrapConsole(ctx)
+	console := cmdx.LineWriter(readConsole(ctx))
 	hCgi := &cgi.Handler{
 		Dir:    fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
 		Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
@@ -209,6 +221,41 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 		}
 		return err
 	})
+}
+
+func readConsole(ctx context.Context) func(string) {
+	lv := slog.LevelDebug
+	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
+	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
+
+	return func(s string) {
+		switch {
+		case strings.Contains(s, `filter not match`):
+			return
+		case strings.Contains(s, `DetectPlatform err:`):
+			return
+		case strings.Contains(s, `detect err:key file lost`):
+			return
+		case strings.HasPrefix(s, "panic:"):
+			lv = slog.LevelError
+		case strings.HasPrefix(s, "RunSafe panic:"):
+			lv = slog.LevelError
+		case re0.MatchString(s):
+			m := re0.FindStringSubmatch(s)
+			if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
+				lv = slog.LevelDebug
+			}
+			s = s[len(m[0]):]
+		case re1.MatchString(s):
+			m := re0.FindStringSubmatch(s)
+			if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
+				lv = slog.LevelDebug
+			}
+			s = s[len(m[0]):]
+		}
+		s = strings.ReplaceAll(s, `\u0000`, "")
+		slog.Log(ctx, lv, s)
+	}
 }
 
 // func panRun(ctx context.Context, cfg Config, env []string) (err error) {
