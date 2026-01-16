@@ -4,6 +4,7 @@ package web
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -61,7 +62,7 @@ func (mux *Mux) UseRecoverer() { mux.Use(Recoverer) }
 //   - handler: HTTP处理器
 //   - processors: 额外的处理器（中间件）
 func (mux *Mux) Handle(pattern string, handler http.Handler) {
-	slog.Debug("handle", "pattern", pattern, "handler", handler, "parent", mux.parent, "cur", mux.cur)
+	slog.Debug("web handle", "pattern", pattern, "handler", handler != nil, "parent", mux.parent != nil, "cur", mux.cur != nil)
 	if mux.parent != nil {
 		mux.parent.Handle(pattern, applyProcessors(handler, mux.processors...))
 	} else {
@@ -118,7 +119,7 @@ func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // 返回启动错误（如果有的话）
 func (mux *Mux) Run(ctx context.Context, addr string) (err error) {
 	s := &http.Server{
-		Addr: addr, Handler: cmp.Or(mux.parent, mux),
+		Addr: addr, Handler: mux,
 		BaseContext: func(l net.Listener) context.Context {
 			slog.InfoContext(ctx, "web started", "listen", l.Addr().String())
 			return ctx
@@ -175,6 +176,46 @@ func Blob[T ~[]byte | ~string](body T, contentType string, status int) http.Hand
 		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(status)
 		w.Write([]byte(body))
+	}
+}
+
+func JSON(body any, status int) http.HandlerFunc {
+	return Blob(utils.Eon(json.Marshal(body)), "application/json", status)
+}
+
+func FBlob[T ~[]byte | ~string](body func() (T, error), contentType string) http.HandlerFunc {
+	headerContentType := "Content-Type"
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := body()
+		if err == nil {
+			w.Header().Set(headerContentType, contentType)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(data))
+		} else {
+			w.Header().Set(headerContentType, "text/plain")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+		}
+	}
+}
+
+func FJSON[T any](body func() (T, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		val, err := body()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		data, err := json.Marshal(val)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		w.Write(data)
 	}
 }
 

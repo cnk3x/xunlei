@@ -10,9 +10,11 @@ import (
 	"net/http/cgi"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/cnk3x/xunlei/embed/authenticate_cgi"
 	"github.com/cnk3x/xunlei/pkg/cmdx"
@@ -147,7 +149,6 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		args = append(args, "-logfile", cfg.LauncherLogFile)
 	}
 
-	pan_ctx := log.Prefix(ctx, "pan")
 	return cmdx.Exec(
 		log.Prefix(ctx, "vms"),
 		PAN_XUNLEI_CLI,
@@ -155,7 +156,7 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		cmdx.Dir(SYNOPKG_PKGDEST+"/bin"),
 		cmdx.Env(envs),
 		cmdx.Credential(cfg.Uid, cfg.Gid),
-		cmdx.LineRead(func(s string) { slog.DebugContext(pan_ctx, s) }),
+		cmdx.LineRead(logPan("pan")),
 	)
 }
 
@@ -164,15 +165,19 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 	mux := web.NewMux()
 	mux.UseRecoverer()
 
-	cgi_ctx := log.Prefix(ctx, "cgi")
-	console := cmdx.LineWriter(func(s string) { slog.DebugContext(cgi_ctx, s) })
+	console := cmdx.LineWriter(logPan("cgi"))
 	hCgi := &cgi.Handler{
-		Dir:    fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
-		Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
-		Env:    env,
-		Logger: utils.LogStd(console),
-		Stderr: console,
+		Dir:  fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
+		Path: fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
+		Env:  env, Logger: utils.LogStd(console), Stderr: console,
 	}
+
+	mux.Handle("/webman/status",
+		web.FBlob(
+			func() (string, error) { return "hello xlp, " + time.Now().Format(time.RFC3339), nil },
+			"text/plain",
+		),
+	)
 
 	mux.Handle("/", web.Redirect(CGI_URL, true))
 	mux.Handle("/web", web.Redirect(CGI_URL, true))
@@ -187,6 +192,7 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 }
 
 func mockEnv(dirDownload []string, dirData string) []string {
+	ld_lib := os.Getenv("LD_LIBRARY_PATH")
 	return append(os.Environ(),
 		"SYNOPLATFORM="+SYNO_PLATFORM,
 		"SYNOPKG_PKGNAME="+SYNOPKG_PKGNAME,
@@ -200,8 +206,8 @@ func mockEnv(dirDownload []string, dirData string) []string {
 		"ConfigPath="+dirData,
 		"HOME="+filepath.Join(dirData, ".drive"),
 		"DownloadPATH="+strings.Join(dirDownload, string(filepath.ListSeparator)),
-		// "TLSInsecureSkipVerify=true",
-		"GIN_MODE=release", "LD_LIBRARY_PATH=/lib",
+		"GIN_MODE=release",
+		"LD_LIBRARY_PATH=/lib"+utils.Iif(ld_lib == "", "", ":")+ld_lib,
 	)
 }
 
@@ -209,6 +215,8 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 	if uid == 0 {
 		return nil
 	}
+
+	slog.DebugContext(ctx, fmt.Sprintf("chown -r %d:%d %s", uid, gid, root))
 
 	return filepath.WalkDir(root, func(path string, _ fs.DirEntry, err error) error {
 		if err == nil {
@@ -224,11 +232,30 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 	})
 }
 
+func logPan(prefix string) func(string) {
+	var l slog.Level
+	p := log.PrefixAttr(prefix)
+	// 2026-01-16T22:08:13.883171573+08:00 INFO|WARNING|ERROR
+	r := regexp.MustCompile(`([0-9T:.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
+	return func(s string) {
+		var t slog.Attr
+		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
+			l = log.LevelFromString(matches[2], slog.LevelDebug)
+			if d, e := time.Parse(matches[1], time.RFC3339Nano); e == nil {
+				t = slog.Time(slog.TimeKey, d)
+			} else {
+				t = slog.String("pan_time", matches[1])
+			}
+			s = s[len(matches[0]):]
+		}
+		slog.LogAttrs(context.Background(), l, s, p, t)
+	}
+}
+
 // func readConsole(ctx context.Context) func(string) {
 // 	lv := slog.LevelDebug
 // 	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
 // 	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
-
 // 	return func(s string) {
 // 		switch {
 // 		case strings.Contains(s, `filter not match`):
