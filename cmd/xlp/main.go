@@ -60,16 +60,17 @@ func main() {
 		slog.InfoContext(ctx, fmt.Sprintf(`xunlei version: %s`, cliVer))
 	}
 
-	if err := vms.Run(log.Prefix(ctx, "boot"), cfg.Chroot, xunlei.NewRun(cfg),
+	err := vms.Run(log.Prefix(ctx, "boot"), cfg.Chroot, xunlei.NewRun(cfg),
 		vms.Before(xunlei.NewBefore(cfg)), vms.Debug(cfg.Debug),
 		vms.Basic,
 		vms.Binds(cfg.Chroot, "/lib", "/bin", "/etc/ssl"),
 		vms.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
 		vms.Links(cfg.Chroot, "/etc/passwd", "/etc/group", "/etc/shadow"),
-	); err != nil {
+	)
+
+	if err != nil {
 		slog.ErrorContext(ctx, "exit", "err", err)
 		os.Exit(1)
 	}
-
 	slog.InfoContext(ctx, "exit")
 }
