@@ -42,8 +42,7 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ secrets.GH_TOKEN }}"
 
-      - run: tree
-      - run: ls -lh ./artifacts
+      - run: pwd && tree
       - name: 构建推送
         uses: docker/build-push-action@v5
         with:
