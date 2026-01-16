@@ -51,6 +51,9 @@ home:: amd64
 load:: amd64
 	$(DBuildBase) --load -t $(NAME):$(VERSION) .
 
+load_arm64:: arm64
+	$(DBuildBase) --load --platform linux/arm64 -t $(NAME):$(VERSION) .
+
 ubuntu:: amd64
 	$(DBuildBase) --load -t $(NAME)-ubuntu:$(VERSION) -f ubuntu.Dockerfile .
 

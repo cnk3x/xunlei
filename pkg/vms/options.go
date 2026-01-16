@@ -1,4 +1,4 @@
-package rootfs
+package vms
 
 import (
 	"cmp"
@@ -6,8 +6,12 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/cnk3x/xunlei/pkg/rootfs/sys"
+	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
+
+func Debug(debug ...bool) Option {
+	return func(ro *RunOptions) { ro.debug = len(debug) == 0 || debug[0] }
+}
 
 func After(after func() error) Option { return func(ro *RunOptions) { ro.after = after } }
 

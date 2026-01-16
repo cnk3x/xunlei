@@ -1,4 +1,4 @@
-package rootfs
+package vms
 
 import (
 	"context"
@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/rootfs/sys"
-	"github.com/samber/lo"
+	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
 // type Undo func()
@@ -25,6 +24,7 @@ type RunOptions struct {
 	links  []sys.LinkOptions
 	before func(ctx context.Context) error
 	after  func() error
+	debug  bool
 }
 
 func Run(ctx context.Context, newRoot string, run func(ctx context.Context) error, options ...Option) (err error) {
@@ -46,42 +46,15 @@ func Run(ctx context.Context, newRoot string, run func(ctx context.Context) erro
 		option(&opts)
 	}
 
-	if opts.root == "" || opts.root == "/" {
-		err = run(ctx)
+	undo, e := seqExecWitUndo(
+		func() (sys.Undo, error) { return sys.Mounts(ctx, opts.mounts) }, //mounts
+		func() (sys.Undo, error) { return sys.Binds(ctx, opts.binds) },   //binds
+		func() (sys.Undo, error) { return sys.Links(ctx, opts.links) },   //links
+	)
+	if err = e; err != nil {
 		return
 	}
-
-	// //兜底
-	// defer func() {
-	// 	if opts.force {
-	// 		exec.Command("sh", "-c", `mount | grep `+newRoot+` | grep on | awk '{print $3}' | xargs -I {} umount {}`).Run()
-	// 	}
-	// }()
-
-	//undos
-	var undos []sys.Undo
-	defer sys.ExecUndo(sys.Undos(&undos), nil)
-
-	var undo sys.Undo
-
-	//mkdirs
-	dirs := lo.Map(opts.mounts, func(m sys.MountOptions, _ int) string { return m.Target })
-	if undo, err = sys.Mkdirs(ctx, dirs, 0777); err != nil {
-		return
-	}
-	undos = append(undos, undo)
-
-	//mounts
-	if undo, err = sys.Mounts(ctx, opts.mounts); err != nil {
-		return
-	}
-	undos = append(undos, undo)
-
-	//links
-	if undo, err = sys.Links(ctx, opts.links); err != nil {
-		return
-	}
-	undos = append(undos, undo)
+	defer undo()
 
 	//after
 	defer func() {
@@ -99,7 +72,27 @@ func Run(ctx context.Context, newRoot string, run func(ctx context.Context) erro
 		}
 	}
 
-	//chroot & run
-	err = sys.Chroot(log.Prefix(ctx, "prog"), opts.root, run)
+	if opts.root == "" || opts.root == "/" {
+		err = run(ctx)
+	} else {
+		//chroot & run
+		err = sys.Chroot(log.Prefix(ctx, "prog"), opts.root, run, opts.debug)
+	}
+	return
+}
+
+func seqExecWitUndo(fns ...func() (undo sys.Undo, err error)) (undo sys.Undo, err error) {
+	var undos []sys.Undo
+	undo = sys.Undos(&undos)
+	defer sys.ExecUndo(undo, &err)
+
+	for _, fn := range fns {
+		u, e := fn()
+		if err = e; err != nil {
+			return
+		}
+		undos = append(undos, u)
+	}
+
 	return
 }

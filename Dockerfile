@@ -1,37 +1,29 @@
-FROM ubuntu:focal
+FROM --platform=${TARGETARCH} ubuntu:focal
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update
-RUN apt-get install --no-install-recommends -y ca-certificates tzdata curl wget xz-utils
-
-ENV rootfs=/rootfs
-RUN mkdir -p ${rootfs}/etc/ssl/certs ${rootfs}/lib
-RUN find /usr/lib \( -name libdl.so.2 -o -name libgcc_s.so.1 -o -name libstdc++.so.6 \) -exec cp -Lr {} ${rootfs}/lib/ \;
-
-RUN cp -Lr /usr/share/zoneinfo/Asia/Chongqing ${rootfs}/etc/localtime
-RUN echo "Asia/Chongqing" >${rootfs}/etc/timezone
-RUN cp -Lr --parents /etc/ssl/certs/ca-certificates.crt ${rootfs}/
+RUN apt-get update \
+  && apt-get install --no-install-recommends -y ca-certificates tzdata \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /rootfs/etc/ssl/certs /rootfs/lib \
+  && find /usr/lib \( -name libdl.so.2 -o -name libgcc_s.so.1 -o -name libstdc++.so.6 \) -exec cp -Lr {} /rootfs/lib/ \; \
+  && cp -Lr /usr/share/zoneinfo/Asia/Chongqing /rootfs/etc/localtime \
+  && echo "Asia/Chongqing" >/rootfs/etc/timezone \
+  && cp -Lr --parents /etc/ssl/certs/ca-certificates.crt /rootfs/
 
 COPY artifacts/xlp-${TARGETARCH} /rootfs/xlp
-COPY xlp.sh /rootfs/xlp.sh
-RUN chmod +x /rootfs/xlp /rootfs/xlp.sh
+RUN chmod +x /rootfs/xlp
 
-FROM busybox:latest
-ARG TARGETARCH
-
-COPY --from=0 /rootfs /rootfs/
-RUN cp -Lr --parents /lib /rootfs/
-
-FROM busybox:latest
+FROM --platform=${TARGETARCH} busybox:1.37
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.authors=cnk3x
 LABEL org.opencontainers.image.source=https://github.com/cnk3x/xunlei
 
-COPY --from=1 /rootfs /
+COPY --from=0 /rootfs /
 
-ENV XL_DASHBOARD_PORT=2345 \
+ENV \
+  XL_DASHBOARD_PORT=2345 \
   XL_DASHBOARD_IP= \
   XL_DASHBOARD_USERNAME= \
   XL_DIR_DOWNLOAD=/xunlei/downloads \

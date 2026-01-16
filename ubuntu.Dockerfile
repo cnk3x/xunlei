@@ -1,13 +1,13 @@
-FROM ubuntu:jammy
+FROM ubuntu:focal
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.authors=cnk3x
 LABEL org.opencontainers.image.source=https://github.com/cnk3x/xunlei
 
-RUN apt update && apt install --no-install-recommends -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/* && \
-  rm -f /etc/localtime /etc/timezone && \
-  cp -Lr /usr/share/zoneinfo/Asia/Chongqing /etc/localtime && \
-  echo "Asia/Chongqing" >/etc/timezone
+# RUN apt update && apt install --no-install-recommends -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/* && \
+#   rm -f /etc/localtime /etc/timezone && \
+#   cp -Lr /usr/share/zoneinfo/Asia/Chongqing /etc/localtime && \
+#   echo "Asia/Chongqing" >/etc/timezone
 
 COPY artifacts/xlp-${TARGETARCH} /xlp
 

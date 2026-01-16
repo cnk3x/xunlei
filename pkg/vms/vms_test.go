@@ -1,4 +1,4 @@
-package rootfs
+package vms
 
 import (
 	"errors"

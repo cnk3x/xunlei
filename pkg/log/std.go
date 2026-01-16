@@ -25,6 +25,13 @@ func ErrDebug(err error) slog.Level {
 	return slog.LevelDebug
 }
 
+func WarnDebug(err error) slog.Level {
+	if err != nil {
+		return slog.LevelWarn
+	}
+	return slog.LevelDebug
+}
+
 type stdWriter struct {
 	ctx       context.Context
 	level     slog.Leveler

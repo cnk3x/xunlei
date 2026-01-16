@@ -61,6 +61,7 @@ func (mux *Mux) UseRecoverer() { mux.Use(Recoverer) }
 //   - handler: HTTP处理器
 //   - processors: 额外的处理器（中间件）
 func (mux *Mux) Handle(pattern string, handler http.Handler) {
+	slog.Debug("handle", "pattern", pattern, "handler", handler, "parent", mux.parent, "cur", mux.cur)
 	if mux.parent != nil {
 		mux.parent.Handle(pattern, applyProcessors(handler, mux.processors...))
 	} else {
@@ -101,7 +102,13 @@ func (mux *Mux) Post(pattern string, handler http.Handler) {
 
 // ServeHTTP 实现http.Handler接口，处理HTTP请求
 func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	cmp.Or[http.Handler](mux.parent, mux.cur).ServeHTTP(w, r)
+	if mux.parent != nil {
+		mux.parent.ServeHTTP(w, r)
+	} else if mux.cur != nil {
+		mux.cur.ServeHTTP(w, r)
+	} else {
+		http.Error(w, "mux is not defined", http.StatusInternalServerError)
+	}
 }
 
 // Run 启动HTTP服务器并监听指定地址

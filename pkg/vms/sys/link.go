@@ -40,22 +40,18 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 	undo = Undos(&undos)
 	defer ExecUndo(undo, &err)
 
-	real, e := filepath.EvalSymlinks(m.Source)
-	if err = e; err != nil {
-		return
-	}
+	var real string
+	var dirUndo Undo
 
-	dirUndo, e := Mkdir(ctx, filepath.Dir(m.Target), m.DirMode)
-	if err = e; err != nil {
-		return
-	}
-	undos = append(undos, dirUndo)
-
-	err = os.Link(real, m.Target)
-	if errors.Is(err, syscall.EXDEV) {
-		err = fo.OpenRead(real, func(src *os.File) (err error) {
-			return fo.OpenWrite(m.Target, fo.From(src), fo.PermFrom(src), fo.FlagExcl)
-		})
+	if real, err = filepath.EvalSymlinks(m.Source); err == nil {
+		if dirUndo, err = Mkdir(ctx, filepath.Dir(m.Target), m.DirMode); err == nil {
+			undos = append(undos, dirUndo)
+			if err = os.Link(real, m.Target); errors.Is(err, syscall.EXDEV) {
+				err = fo.OpenRead(real, func(src *os.File) (err error) {
+					return fo.OpenWrite(m.Target, fo.From(src), fo.PermFrom(src), fo.FlagExcl)
+				})
+			}
+		}
 	}
 
 	attrs := []slog.Attr{
@@ -74,6 +70,7 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
 	case err != nil && m.Optional:
 		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
+		err = nil
 	case err != nil && !m.Optional:
 		slog.LogAttrs(ctx, slog.LevelWarn, "link fail", attrs...)
 	default:

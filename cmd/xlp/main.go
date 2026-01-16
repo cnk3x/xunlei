@@ -7,11 +7,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/cnk3x/xunlei"
 	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/rootfs"
 	"github.com/cnk3x/xunlei/pkg/utils"
+	"github.com/cnk3x/xunlei/pkg/vms"
 	"github.com/cnk3x/xunlei/spk"
 )
 
@@ -24,7 +25,7 @@ func main() {
 
 	log.ForDefault(utils.Iif(cfg.Debug, "debug", "info"), false)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	ctx = log.Prefix(ctx, "main")
@@ -59,13 +60,12 @@ func main() {
 		slog.InfoContext(ctx, fmt.Sprintf(`xunlei version: %s`, cliVer))
 	}
 
-	if err := rootfs.Run(
-		log.Prefix(ctx, "boot"),
-		cfg.Chroot, xunlei.NewRun(cfg),
-		rootfs.Before(xunlei.NewBefore(cfg)),
-		rootfs.Basic,
-		rootfs.Binds(cfg.Chroot, "/lib", "/lib64", "/usr", "/sbin", "/bin", "/etc/ssl"),
-		rootfs.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf", "/etc/passwd", "/etc/group", "/etc/shadow"),
+	if err := vms.Run(log.Prefix(ctx, "boot"), cfg.Chroot, xunlei.NewRun(cfg),
+		vms.Before(xunlei.NewBefore(cfg)), vms.Debug(cfg.Debug),
+		vms.Basic,
+		vms.Binds(cfg.Chroot, "/lib", "/bin", "/etc/ssl"),
+		vms.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
+		vms.Links(cfg.Chroot, "/etc/passwd", "/etc/group", "/etc/shadow"),
 	); err != nil {
 		slog.ErrorContext(ctx, "exit", "err", err)
 		os.Exit(1)

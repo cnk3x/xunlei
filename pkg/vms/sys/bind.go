@@ -20,12 +20,19 @@ func Binds(ctx context.Context, items []BindOptions) (undo Undo, err error) {
 // 绑定文件夹
 func Bind(ctx context.Context, m BindOptions) (undo Undo, err error) {
 	src := m.Source
-	if src, err = filepath.EvalSymlinks(src); err == nil {
-		err = syscall.Mount(src, m.Target, "", syscall.MS_BIND, "")
-	}
 
-	if err == nil {
-		undo = mkUnmount(ctx, m.Target, "unbind")
+	var undos []Undo
+	undo = Undos(&undos)
+	defer ExecUndo(undo, &err)
+
+	if src, err = filepath.EvalSymlinks(src); err == nil {
+		var dirUndo Undo
+		if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
+			undos = append(undos, dirUndo)
+			if err = syscall.Mount(src, m.Target, "", syscall.MS_BIND, ""); err == nil {
+				undos = append(undos, mkUnmount(ctx, m.Target, "unbind"))
+			}
+		}
 	}
 
 	attrs := []slog.Attr{
