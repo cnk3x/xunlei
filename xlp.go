@@ -10,7 +10,6 @@ import (
 	"net/http/cgi"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -148,14 +147,15 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		args = append(args, "-logfile", cfg.LauncherLogFile)
 	}
 
+	pan_ctx := log.Prefix(ctx, "pan")
 	return cmdx.Exec(
-		log.Prefix(ctx, "pan"),
+		log.Prefix(ctx, "vms"),
 		PAN_XUNLEI_CLI,
 		cmdx.Args(args...),
 		cmdx.Dir(SYNOPKG_PKGDEST+"/bin"),
 		cmdx.Env(envs),
 		cmdx.Credential(cfg.Uid, cfg.Gid),
-		cmdx.LineRead(readConsole(ctx)),
+		cmdx.LineRead(func(s string) { slog.DebugContext(pan_ctx, s) }),
 	)
 }
 
@@ -164,7 +164,8 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 	mux := web.NewMux()
 	mux.UseRecoverer()
 
-	console := cmdx.LineWriter(readConsole(ctx))
+	cgi_ctx := log.Prefix(ctx, "cgi")
+	console := cmdx.LineWriter(func(s string) { slog.DebugContext(cgi_ctx, s) })
 	hCgi := &cgi.Handler{
 		Dir:    fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
 		Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
@@ -223,40 +224,40 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 	})
 }
 
-func readConsole(ctx context.Context) func(string) {
-	lv := slog.LevelDebug
-	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
-	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
+// func readConsole(ctx context.Context) func(string) {
+// 	lv := slog.LevelDebug
+// 	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
+// 	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
 
-	return func(s string) {
-		switch {
-		case strings.Contains(s, `filter not match`):
-			return
-		case strings.Contains(s, `DetectPlatform err:`):
-			return
-		case strings.Contains(s, `detect err:key file lost`):
-			return
-		case strings.HasPrefix(s, "panic:"):
-			lv = slog.LevelError
-		case strings.HasPrefix(s, "RunSafe panic:"):
-			lv = slog.LevelError
-		case re0.MatchString(s):
-			m := re0.FindStringSubmatch(s)
-			if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
-				lv = slog.LevelDebug
-			}
-			s = s[len(m[0]):]
-		case re1.MatchString(s):
-			m := re0.FindStringSubmatch(s)
-			if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
-				lv = slog.LevelDebug
-			}
-			s = s[len(m[0]):]
-		}
-		s = strings.ReplaceAll(s, `\u0000`, "")
-		slog.Log(ctx, lv, s)
-	}
-}
+// 	return func(s string) {
+// 		switch {
+// 		case strings.Contains(s, `filter not match`):
+// 			return
+// 		case strings.Contains(s, `DetectPlatform err:`):
+// 			return
+// 		case strings.Contains(s, `detect err:key file lost`):
+// 			return
+// 		case strings.HasPrefix(s, "panic:"):
+// 			lv = slog.LevelError
+// 		case strings.HasPrefix(s, "RunSafe panic:"):
+// 			lv = slog.LevelError
+// 		case re0.MatchString(s):
+// 			m := re0.FindStringSubmatch(s)
+// 			if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
+// 				lv = slog.LevelDebug
+// 			}
+// 			s = s[len(m[0]):]
+// 		case re1.MatchString(s):
+// 			m := re0.FindStringSubmatch(s)
+// 			if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
+// 				lv = slog.LevelDebug
+// 			}
+// 			s = s[len(m[0]):]
+// 		}
+// 		s = strings.ReplaceAll(s, `\u0000`, "")
+// 		slog.Log(ctx, lv, s)
+// 	}
+// }
 
 // func panRun(ctx context.Context, cfg Config, env []string) (err error) {
 // 	// /data/.drive/bin/xunlei-pan-cli.3.23.5.amd64

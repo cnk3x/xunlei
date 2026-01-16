@@ -2,8 +2,6 @@ name: build
 
 on:
   workflow_dispatch:
-  tags:
-    - "*"
 
 jobs:
   build:
@@ -57,11 +55,12 @@ jobs:
       - name: 构建推送
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/cnk3x/xunlei:${{ steps.prepare.outputs.version }}
-            cnk3x/xunlei:${{ steps.prepare.outputs.version }}
+            ghcr.io/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
+            cnk3x/xunlei:${{ steps.get_version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -78,7 +77,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         env: { GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}" }
         with:
-          context: .
           tag_name: v${{ steps.get_version.outputs.version }}
           name: v${{ steps.get_version.outputs.version }}
           files: |
