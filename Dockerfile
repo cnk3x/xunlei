@@ -1,9 +1,9 @@
-FROM ubuntu:jammy
+FROM ubuntu:focal
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt update
-RUN apt install --no-install-recommends -y ca-certificates tzdata curl wget xz-utils
+RUN apt-get update
+RUN apt-get install --no-install-recommends -y ca-certificates tzdata curl wget xz-utils
 
 ENV rootfs=/rootfs
 RUN mkdir -p ${rootfs}/etc/ssl/certs ${rootfs}/lib
