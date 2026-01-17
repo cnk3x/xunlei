@@ -53,7 +53,7 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 
 	switch {
 	case ok:
-		slog.DebugContext(ctx, "mkdir done", "dir", dir)
+		// slog.DebugContext(ctx, "mkdir done", "dir", dir)
 	default:
 		slog.DebugContext(ctx, "mkdir skip", "dir", dir, "cause", "directory exists")
 	}
@@ -70,7 +70,7 @@ func newRm(ctx context.Context, target, act string) func() {
 			case err != nil:
 				slog.LogAttrs(ctx, slog.LevelWarn, act+" fail", slog.String("target", target), slog.String("err", err.Error()))
 			default:
-				slog.LogAttrs(ctx, slog.LevelDebug, act+" done", slog.String("target", target))
+				// slog.LogAttrs(ctx, slog.LevelDebug, act+" done", slog.String("target", target))
 			}
 		}
 	}
