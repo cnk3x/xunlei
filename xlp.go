@@ -78,6 +78,7 @@ func Run(cfg Config) func(ctx context.Context) error {
 			func() (err error) { dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); return },
 			func() (err error) { return spk.Download(ctx, cfg.SpkUrl, DIR_SYNOPKG_PKGDEST, cfg.ForceDownload) },
 			func() (err error) { return utils.Eol(sys.Mkdirs(ctx, append(dirDownload, dirData...), 0777)) },
+			func() (err error) { return os.MkdirAll(DIR_VAR, 0777) },
 		)
 		if err != nil {
 			return
