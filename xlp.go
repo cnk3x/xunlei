@@ -141,7 +141,7 @@ func Run(cfg Config) func(ctx context.Context) error {
 			),
 			cmdx.Dir(DIR_SYNOPKG_WORK),
 			cmdx.Env(envs),
-			cmdx.Credential(cfg.Uid, cfg.Gid),
+			// cmdx.Credential(cfg.Uid, cfg.Gid),
 			cmdx.LineErr(logPan("pan", "stderr")),
 			cmdx.LineOut(logPan("pan", "stdout")),
 			cmdx.OnStarted(func(c *cmdx.Cmd) error {
