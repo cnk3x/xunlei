@@ -145,11 +145,11 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	defer c1.Close()
 
 	c2 := cmdx.LineWriter(func() func(s string) {
-		r := regexp.MustCompile(`^(\d{4})/(\d{2})/(\d{2}) (\d{2}):(\d{2}):\d{2})\s+`)
+		r := regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+`)
 		return func(s string) {
 			var t slog.Attr
 			if matches := r.FindStringSubmatch(s); len(matches) > 0 {
-				if d, e := time.Parse("2026/01/16 22:08:13", s); e == nil {
+				if d, e := time.Parse("2026/01/16 22:08:13", matches[1]); e == nil {
 					t = slog.Time(slog.TimeKey, d)
 				} else {
 					t = slog.String("pan_time", matches[1])
