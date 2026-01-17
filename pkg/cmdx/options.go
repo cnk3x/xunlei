@@ -56,11 +56,13 @@ func Args(args ...string) Option {
 	return May(func(c *Cmd) { c.Args = append(c.Args[:1], args...) })
 }
 
-func MapArgs(args ...string) Option {
+const True = "___true"
+
+func Flags(args ...string) Option {
 	var selectedArgs []string
 	for i := 0; i < len(args)-1; i += 2 {
 		if k, v := args[i], args[i+1]; k != "" && v != "" {
-			if v == "true" {
+			if v == True {
 				selectedArgs = append(selectedArgs, k)
 			} else {
 				selectedArgs = append(selectedArgs, k, v)
@@ -120,26 +122,29 @@ type Undo = func()
 func eUndo[E any](f func() E) Undo { return func() { _ = f() } }
 
 func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
-	if apply, ok := any(option).(func(*Cmd)); ok {
-		apply(t)
+	undo = func() {}
+
+	if optApply, ok := any(option).(func(*Cmd)); ok {
+		optApply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*Cmd) error); ok {
-		err = apply(t)
+	if optApply, ok := any(option).(func(*Cmd) error); ok {
+		err = optApply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*Cmd) Undo); ok {
-		undo = apply(t)
+	if optApply, ok := any(option).(func(*Cmd) Undo); ok {
+		undo = optApply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
-		undo, err = apply(t)
+	if optApply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
+		undo, err = optApply(t)
 		return
 	}
 
+	err = fmt.Errorf("[%T]%v: apply error", option, option)
 	return
 }
 

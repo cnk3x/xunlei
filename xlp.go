@@ -95,7 +95,7 @@ func Run(cfg Config) func(ctx context.Context) error {
 		return cmdx.Exec(
 			log.Prefix(ctx, "vms"),
 			FILE_PAN_XUNLEI_CLI,
-			cmdx.MapArgs(
+			cmdx.Flags(
 				"-launcher_listen", "unix://"+SOCK_LAUNCHER_LISTEN,
 				"-pid", FILE_PID,
 				"-update_url", utils.Iif(cfg.PreventUpdate, "null", ""),
