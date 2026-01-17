@@ -7,9 +7,36 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: 设置时区
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Chongqing /etc/localtime
+          sudo echo "Asia/Chongqing" > /etc/timezone
+          echo "系统当前时区：$(cat /etc/timezone)"
+          echo "系统当前时间：$(date)"
+
       - name: 检出代码
         uses: actions/checkout@v6
         with: { repository: cnk3x/xunlei, ref: "${{ github.ref }}" }
+
+      - name: 设置版本
+        id: version
+        run: |
+          v_xlp=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
+          if [ -z "${v_xlp}" ]; then
+            echo "错误：未能从代码中提取到版本号"
+            exit 1
+          fi
+          echo "v_xlp=${v_xlp}" >> $GITHUB_OUTPUT
+
+          v_date=$(date +'%Y%m%d-%H%M%S')
+          echo "v_date=${v_date}" >> $GITHUB_OUTPUT
+
+          v_test="${v_xlp}-test-${v_date}"
+          echo "v_test=${v_test} >> $GITHUB_OUTPUT
+
+          echo "v_xlp: ${v_xlp}"
+          echo "v_date: ${v_date}"
+          echo "v_test: ${v_test}"
 
       - name: 配置环境
         uses: actions/setup-go@v6
@@ -21,13 +48,6 @@ jobs:
           GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
         env: { CGO_ENABLED: 0, GOOS: linux }
-
-      - name: 设置版本
-        id: set_version
-        run: |
-          VERSION="dev-$(date +'%Y%m%d-%H%M%S')"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "版本号：$VERSION"
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
@@ -42,13 +62,12 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ secrets.GH_TOKEN }}"
 
-      - run: pwd && tree
       - name: 构建推送
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/cnk3x/xunlei:${{ steps.set_version.outputs.version }}
+          tags: ghcr.io/cnk3x/xunlei:${{ steps.version.outputs.v_test }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

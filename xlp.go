@@ -26,7 +26,7 @@ import (
 	"github.com/cnk3x/xunlei/pkg/web"
 )
 
-const Version = "3.21"
+const Version = "3.22.0"
 
 const (
 	SYNOPKG_DSM_VERSION_MAJOR = "7"     //系统的主版本

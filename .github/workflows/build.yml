@@ -2,18 +2,53 @@ name: build
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - "v*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: 设置时区
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Chongqing /etc/localtime
+          sudo echo "Asia/Chongqing" > /etc/timezone
+          echo "系统当前时区：$(cat /etc/timezone)"
+          echo "系统当前时间：$(date)"
+
       - name: 检出代码
         uses: actions/checkout@v6
-        with: { repository: cnk3x/xunlei, ref: "${{ github.ref }}" }
+
+      - name: 设置版本
+        id: version
+        run: |
+          v_xlp=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
+          if [ -z "${v_xlp}" ]; then
+            echo "错误：未能从代码中提取到版本号"
+            exit 1
+          fi
+          echo "v_xlp=${v_xlp}" >> $GITHUB_OUTPUT
+          echo "v_xlp: ${v_xlp}"
+
+      - name: 设置镜像标签
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            cnk3x/xunlei
+            ghcr.io/cnk3x/xunlei
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.v_xlp }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.v_xlp }}
+            type=semver,pattern={{major}},value=v${{ steps.version.outputs.v_xlp }}
+            type=raw,value=latest
+          flavor: |
+            latest=true
 
       - name: 配置环境
         uses: actions/setup-go@v6
-        with: { go-version: "stable" }
+        with: { go-version: ">=1.25.0" }
 
       - name: 编译程序
         run: |
@@ -21,17 +56,6 @@ jobs:
           GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
         env: { CGO_ENABLED: 0, GOOS: linux }
-
-      - name: 设置版本
-        id: get_version
-        run: |
-          VERSION=$(cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
-          if [ -z "$VERSION" ]; then
-            echo "错误：未能从xlp.go中提取到版本号"
-            exit 1
-          fi
-          echo "version=$VERSION" > $GITHUB_OUTPUT
-          echo "版本号：$VERSION"
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
@@ -58,27 +82,28 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/cnk3x/xunlei:${{ steps.get_version.outputs.version }}
-            cnk3x/xunlei:${{ steps.get_version.outputs.version }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: 整理产物
+        env: { v_xlp: "${{ steps.version.outputs.v_xlp }}" }
         run: |
           cd ./artifacts
           mv xlp-amd64 xlp
-          tar -zcvf xlp-amd64.tar.gz xlp
+          tar -zcvf xlp-${v_xlp}-linux-amd64.tar.gz xlp
           mv xlp-arm64 xlp
-          tar -zcvf xlp-arm64.tar.gz xlp
+          tar -zcvf xlp-${v_xlp}-linux-arm64.tar.gz xlp
           ls -lh *.tar.gz
 
       - name: 发布上传
         uses: softprops/action-gh-release@v2
         env: { GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}" }
         with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          name: v${{ steps.get_version.outputs.version }}
+          draft: true
+          name: "v${{ steps.version.outputs.v_xlp }}"
+          tag_name: "v${{ steps.version.outputs.v_xlp }}"
+          body_path: CHANGELOG.md
           files: |
-            ./artifacts/xlp-amd64.tar.gz
-            ./artifacts/xlp-arm64.tar.gz
+            artifacts/xlp-${{ steps.version.outputs.v_xlp }}-linux-amd64.tar.gz
+            artifacts/xlp-${{ steps.version.outputs.v_xlp }}-linux-arm64.tar.gz
