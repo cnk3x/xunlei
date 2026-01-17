@@ -56,6 +56,20 @@ func Args(args ...string) Option {
 	return May(func(c *Cmd) { c.Args = append(c.Args[:1], args...) })
 }
 
+func MapArgs(args ...string) Option {
+	var selectedArgs []string
+	for i := 0; i < len(args)-1; i += 2 {
+		if k, v := args[i], args[i+1]; k != "" && v != "" {
+			if v == "true" {
+				selectedArgs = append(selectedArgs, k)
+			} else {
+				selectedArgs = append(selectedArgs, k, v)
+			}
+		}
+	}
+	return Args(selectedArgs...)
+}
+
 func Dir(dir string) Option               { return May(func(c *Cmd) { c.Dir = dir }) }
 func Env(env []string) Option             { return May(func(c *Cmd) { c.Env = env }) }
 func Stderr(w io.Writer) Option           { return May(func(c *Cmd) { c.Stderr = w }) }

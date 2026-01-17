@@ -20,18 +20,17 @@ type LinkOptions struct {
 	Copy     bool
 }
 
-func Links(ctx context.Context, links []LinkOptions) (undo Undo, err error) {
-	var undos []Undo
-	undo = Undos(&undos)
-	defer ExecUndo(undo, &err)
-	for _, m := range links {
-		u, e := Link(ctx, m)
-		if err = e; e != nil {
-			return
+func Links(ctx context.Context, items []LinkOptions) (undo Undo, err error) {
+	return doMulti(ctx, items, Link)
+}
+
+func LinkRs(ctx context.Context, root string, items []LinkOptions) (undo Undo, err error) {
+	for i := range items {
+		if items[i].Target == "" {
+			items[i].Target = filepath.Join(root, items[i].Source)
 		}
-		undos = append(undos, u)
 	}
-	return
+	return doMulti(ctx, items, Link)
 }
 
 // link hard link, only for file
@@ -41,18 +40,24 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 	defer ExecUndo(undo, &err)
 
 	var real string
-	var dirUndo Undo
-
-	if real, err = filepath.EvalSymlinks(m.Source); err == nil {
-		if dirUndo, err = Mkdir(ctx, filepath.Dir(m.Target), m.DirMode); err == nil {
-			undos = append(undos, dirUndo)
-			if err = os.Link(real, m.Target); errors.Is(err, syscall.EXDEV) {
-				err = fo.OpenRead(real, func(src *os.File) (err error) {
-					return fo.OpenWrite(m.Target, fo.From(src), fo.PermFrom(src), fo.FlagExcl)
-				})
-			}
+	err = func() (err error) {
+		if real, err = filepath.EvalSymlinks(m.Source); err != nil {
+			return
 		}
-	}
+
+		du, e := Mkdir(ctx, filepath.Dir(m.Target), m.DirMode)
+		if err = e; err != nil {
+			return
+		}
+		undos = append(undos, du)
+
+		if err = os.Link(real, m.Target); !errors.Is(err, syscall.EXDEV) {
+			return
+		}
+
+		err = fo.OpenRead(real, fo.ToFile(m.Target, fo.Perm(0777), fo.FlagExcl(false)))
+		return
+	}()
 
 	attrs := []slog.Attr{
 		slog.String("target", m.Target),
@@ -67,6 +72,7 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 
 	switch {
 	case os.IsExist(err):
+		err = nil
 		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
 	case err != nil && m.Optional:
 		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
@@ -78,8 +84,5 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		undos = append(undos, newRm(ctx, m.Target, "unlink"))
 	}
 
-	if os.IsExist(err) {
-		err = nil
-	}
 	return
 }

@@ -1,40 +1,31 @@
 package vms
 
 import (
-	"cmp"
 	"context"
-	"io/fs"
 	"path/filepath"
 
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
+func Root(root string) Option { return func(ro *Options) { ro.root = root } }
+
+func Run(run func(ctx context.Context) error) Option { return func(ro *Options) { ro.run = run } }
+
+func User(uid, gid int) Option { return func(ro *Options) { ro.uid, ro.gid = uid, gid } }
+
 func Debug(debug ...bool) Option {
-	return func(ro *RunOptions) { ro.debug = len(debug) == 0 || debug[0] }
+	return func(ro *Options) { ro.debug = len(debug) == 0 || debug[0] }
 }
 
-func After(after func() error) Option { return func(ro *RunOptions) { ro.after = after } }
-
-func Before(before func(ctx context.Context) error) Option {
-	return func(ro *RunOptions) { ro.before = before }
+func After(after func(ctx context.Context, runErr error) (err error)) Option {
+	return func(ro *Options) { ro.after = after }
 }
 
-func Link(source, target string, dirMode fs.FileMode, optional ...bool) Option {
-	return func(ro *RunOptions) {
-		ro.links = append(ro.links, sys.LinkOptions{
-			Target:   target,
-			Source:   source,
-			DirMode:  dirMode,
-			Optional: cmp.Or(optional...),
-		})
-	}
+func Before(before func(ctx context.Context) (err error)) Option {
+	return func(ro *Options) { ro.before = before }
 }
 
-func LinkRoot(source, newRoot string, dirMode fs.FileMode, optional ...bool) Option {
-	return Link(source, filepath.Join(newRoot, source), dirMode, optional...)
-}
-
-func Basic(ro *RunOptions) {
+func Basic(ro *Options) {
 	ro.mounts = append(ro.mounts,
 		// 挂载proc文件系统（必须）
 		sys.MountOptions{Target: filepath.Join(ro.root, "proc"), Source: "proc", Fstype: "proc"},
@@ -47,11 +38,10 @@ func Basic(ro *RunOptions) {
 	)
 }
 
-func Links(root string, files ...string) Option {
-	return func(ro *RunOptions) {
+func Links(files ...string) Option {
+	return func(ro *Options) {
 		for _, file := range files {
 			mOpts := sys.LinkOptions{
-				Target:   filepath.Join(root, file),
 				Source:   file,
 				Optional: true,
 				DirMode:  0777,
@@ -61,11 +51,10 @@ func Links(root string, files ...string) Option {
 	}
 }
 
-func Binds(root string, dirs ...string) func(ro *RunOptions) {
-	return func(ro *RunOptions) {
+func Binds(dirs ...string) func(ro *Options) {
+	return func(ro *Options) {
 		for _, dir := range dirs {
 			mOpts := sys.BindOptions{
-				Target:   filepath.Join(root, dir),
 				Source:   dir,
 				Optional: true,
 			}

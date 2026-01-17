@@ -11,11 +11,10 @@ import (
 
 type Process func(*os.File) (err error)
 
-func openFile(name string, process Process, defaultFlag int, options ...Option) (err error) {
-	opts := Options{flag: defaultFlag, perm: 0666}
-
-	for _, option := range options {
-		option(&opts)
+func openFile(name string, process Process, defaultFlag int, fOpts ...Option) (err error) {
+	opts := options{flag: defaultFlag}
+	for _, apply := range fOpts {
+		apply(&opts)
 	}
 
 	if opts.flag&os.O_CREATE != 0 {
@@ -25,42 +24,50 @@ func openFile(name string, process Process, defaultFlag int, options ...Option) 
 	}
 
 	f, e := os.OpenFile(name, opts.flag, cmp.Or(opts.perm, 0666))
-	if err = e; err != nil {
+	if e != nil && !(opts.existOk && os.IsExist(e)) {
+		err = e
 		return
 	}
 
-	err = process(f)
-
-	if e := f.Close(); e != nil && err == nil {
+	if err, e = process(f), f.Close(); err == nil && e != nil {
 		err = e
 	}
 	return
 }
 
+// OpenWrite 写入
 func OpenWrite(name string, process Process, options ...Option) (err error) {
 	return openFile(name, process, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, options...)
 }
 
+// OpenRead 读取
 func OpenRead(name string, process Process, options ...Option) (err error) {
 	return openFile(name, process, os.O_RDONLY, options...)
 }
 
-func To(w io.Writer) Process   { return func(r *os.File) error { return utils.Eol(io.Copy(w, r)) } }
+// To 将读取的文件写入到w
+func To(w io.Writer) Process { return func(r *os.File) error { return utils.Eol(io.Copy(w, r)) } }
+
+// From 将源r写入到文件
 func From(r io.Reader) Process { return func(w *os.File) error { return utils.Eol(io.Copy(w, r)) } }
 
-func ToFile(to string, options ...Option) func(src *os.File) error {
+// To File 将读取的文件写入到文件
+func ToFile(to string, options ...Option) Process {
 	return func(src *os.File) error { return OpenWrite(to, From(src), options...) }
 }
 
-func FromFile(from string, options ...Option) func(w *os.File) error {
+// FromFile 从文件读取并写入到打开的文件
+func FromFile(from string, options ...Option) Process {
 	return func(w *os.File) error { return OpenRead(from, To(w), options...) }
 }
 
-func Content[T ~string | ~[]byte](content T) func(w *os.File) error {
+// 将内容写入到打开的文件
+func Content[T ~string | ~[]byte](content T) Process {
 	return func(w *os.File) (err error) { return utils.Eol(w.Write([]byte(content))) }
 }
 
-func Lines[T ~string | ~[]byte](lines ...T) func(w *os.File) error {
+// 将内容行写入到打开的文件
+func Lines[T ~string | ~[]byte](lines ...T) Process {
 	return func(w *os.File) (err error) {
 		for _, line := range lines {
 			if _, err = w.Write([]byte(line)); err != nil {
@@ -76,7 +83,5 @@ func Lines[T ~string | ~[]byte](lines ...T) func(w *os.File) error {
 	}
 }
 
+// 什么都不干
 func Nop(w *os.File) error { return nil }
-
-// func Eol[T any](_ T, err error) error { return err }
-// func Eon[T any, E any](v T, _ E) T    { return v }

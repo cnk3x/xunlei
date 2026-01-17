@@ -16,6 +16,10 @@ func NewRootPath(newRoot string, targets ...string) (relPath []string, err error
 	}
 
 	for _, target := range targets {
+		if target == "" {
+			err = fmt.Errorf("target is empty")
+			return
+		}
 		if target, err = filepath.Abs(target); err != nil {
 			return
 		}

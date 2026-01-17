@@ -6,14 +6,12 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/cnk3x/xunlei"
 	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms"
-	"github.com/cnk3x/xunlei/spk"
 )
 
 func main() {
@@ -47,30 +45,23 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("spk_url: %s", cfg.SpkUrl))
 	slog.InfoContext(ctx, fmt.Sprintf("force_download: %t", cfg.ForceDownload))
 
-	if err := spk.Download(ctx, cfg.SpkUrl, filepath.Join(cfg.Chroot, xunlei.SYNOPKG_PKGDEST), cfg.ForceDownload); err != nil {
-		slog.ErrorContext(ctx, "exit", "err", err)
-		os.Exit(1)
-	}
+	err := vms.Exec(
+		log.Prefix(ctx, "boot"),
 
-	if spkVer := utils.Cat(filepath.Join(cfg.Chroot, xunlei.PAN_XUNLEI_VER)); spkVer != "" {
-		slog.InfoContext(ctx, fmt.Sprintf(`spk version: %s`, spkVer))
-	}
+		vms.Before(xunlei.Before(cfg)),
+		vms.Run(xunlei.Run(cfg)),
+		vms.Debug(cfg.Debug),
 
-	if cliVer := utils.Cat(filepath.Join(cfg.DirData, ".drive", "bin", "version")); cliVer != "" {
-		slog.InfoContext(ctx, fmt.Sprintf(`xunlei version: %s`, cliVer))
-	}
-
-	err := vms.Run(log.Prefix(ctx, "boot"), cfg.Chroot, xunlei.NewRun(cfg),
-		vms.Before(xunlei.NewBefore(cfg)), vms.Debug(cfg.Debug),
+		vms.Root(cfg.Chroot),
+		vms.Binds("/lib", "/bin", "/etc/ssl"),
+		vms.Links("/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
+		vms.Links("/etc/passwd", "/etc/group", "/etc/shadow"),
 		vms.Basic,
-		vms.Binds(cfg.Chroot, "/lib", "/bin", "/etc/ssl"),
-		vms.Links(cfg.Chroot, "/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
-		vms.Links(cfg.Chroot, "/etc/passwd", "/etc/group", "/etc/shadow"),
 	)
 
 	if err != nil {
 		slog.ErrorContext(ctx, "exit", "err", err)
-		os.Exit(1)
+	} else {
+		slog.InfoContext(ctx, "exit")
 	}
-	slog.InfoContext(ctx, "exit")
 }

@@ -17,6 +17,15 @@ func Binds(ctx context.Context, items []BindOptions) (undo Undo, err error) {
 	return doMulti(ctx, items, Bind)
 }
 
+func BindRs(ctx context.Context, root string, items []BindOptions) (undo Undo, err error) {
+	for i := range items {
+		if items[i].Target == "" {
+			items[i].Target = filepath.Join(root, items[i].Source)
+		}
+	}
+	return doMulti(ctx, items, Bind)
+}
+
 // 绑定文件夹
 func Bind(ctx context.Context, m BindOptions) (undo Undo, err error) {
 	src := m.Source

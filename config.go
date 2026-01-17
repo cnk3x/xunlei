@@ -54,9 +54,8 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.Chroot, "chroot", "r", "CHROOT主目录", "XL_CHROOT")
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
 	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载")
-	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
-
 	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志")
+	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 
 	if err = flags.Parse(); err != nil {
 		return

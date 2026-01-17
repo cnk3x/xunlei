@@ -16,6 +16,7 @@ type MountOptions struct {
 	Flags    uintptr
 	Data     string
 	Optional bool
+	Root     string
 }
 
 func Mounts(ctx context.Context, mounts []MountOptions) (undo Undo, err error) {
