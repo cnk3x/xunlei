@@ -21,6 +21,7 @@ import (
 	"github.com/cnk3x/xunlei/pkg/fo"
 	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/utils"
+	"github.com/cnk3x/xunlei/pkg/vms/sys"
 	"github.com/cnk3x/xunlei/pkg/web"
 )
 
@@ -64,14 +65,7 @@ func NewBefore(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
 		_ = cmdx.FileShell(ctx, utils.Eon(os.Executable())+"_before.sh")
 
-		libDir := filepath.Join(cfg.Chroot, "lib")
-		for _, dir := range append(cfg.DirDownload, cfg.DirData, filepath.Join(cfg.Chroot, VAR_DIR), libDir) {
-			err = os.MkdirAll(dir, 0777)
-			slog.Log(ctx, log.ErrDebug(err), "create dir", "dir", dir, "err", err)
-			if err != nil {
-				return
-			}
-		}
+		sys.Mkdirs(ctx, append(cfg.DirDownload, cfg.DirData, filepath.Join(cfg.Chroot, VAR_DIR)), 0777)
 
 		path := filepath.Join(cfg.Chroot, PATH_SYNO_AUTHENTICATE_CGI)
 		if err = authenticate_cgi.SaveTo(path); os.IsExist(err) {
@@ -238,16 +232,29 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 func logPan(module, prefix string) func(string) {
 	var l slog.Level
 	p := log.PrefixAttr(module)
+	// 2026-01-17T12:51:53.176432382+08:00
 	// 2026-01-16T22:08:13.883171573+08:00 INFO|WARNING|ERROR
 	r := regexp.MustCompile(`([0-9T:.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
 	if prefix != "" {
 		prefix = fmt.Sprintf("[%s] ", prefix)
 	}
+
+	timeParse := func(s string) (time.Time, bool) {
+		if t, e := time.Parse("2006-01-02T15:04:05.999999999-0700", s); e == nil {
+			return t, true
+		}
+		t, e := time.Parse(time.RFC3339Nano, s)
+		if e == nil {
+			return t, true
+		}
+		return time.Time{}, false
+	}
+
 	return func(s string) {
 		var t slog.Attr
 		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
 			l = log.LevelFromString(matches[2], slog.LevelDebug)
-			if d, e := time.Parse(matches[1], time.RFC3339Nano); e == nil {
+			if d, ok := timeParse(matches[1]); ok {
 				t = slog.Time(slog.TimeKey, d)
 			} else {
 				t = slog.String("pan_time", matches[1])
@@ -257,40 +264,6 @@ func logPan(module, prefix string) func(string) {
 		slog.LogAttrs(context.Background(), l, prefix+s, p, t)
 	}
 }
-
-// func readConsole(ctx context.Context) func(string) {
-// 	lv := slog.LevelDebug
-// 	re0 := regexp.MustCompile(`^\d{2}/\d{2} \d{2}:\d{2}:\d{2}(\.\d+)? (INFO|ERROR|WARNING)\s*>?\s*`)
-// 	re1 := regexp.MustCompile(`^[\dTZ:\.-]?\s*(INFO|ERROR|WARNING)\s*(\[\d+\])?\s*`)
-// 	return func(s string) {
-// 		switch {
-// 		case strings.Contains(s, `filter not match`):
-// 			return
-// 		case strings.Contains(s, `DetectPlatform err:`):
-// 			return
-// 		case strings.Contains(s, `detect err:key file lost`):
-// 			return
-// 		case strings.HasPrefix(s, "panic:"):
-// 			lv = slog.LevelError
-// 		case strings.HasPrefix(s, "RunSafe panic:"):
-// 			lv = slog.LevelError
-// 		case re0.MatchString(s):
-// 			m := re0.FindStringSubmatch(s)
-// 			if lv = log.LevelFromString(m[2], slog.LevelDebug); lv == slog.LevelInfo {
-// 				lv = slog.LevelDebug
-// 			}
-// 			s = s[len(m[0]):]
-// 		case re1.MatchString(s):
-// 			m := re0.FindStringSubmatch(s)
-// 			if lv = log.LevelFromString(m[1], slog.LevelDebug); lv == slog.LevelInfo {
-// 				lv = slog.LevelDebug
-// 			}
-// 			s = s[len(m[0]):]
-// 		}
-// 		s = strings.ReplaceAll(s, `\u0000`, "")
-// 		slog.Log(ctx, lv, s)
-// 	}
-// }
 
 // func panRun(ctx context.Context, cfg Config, env []string) (err error) {
 // 	// /data/.drive/bin/xunlei-pan-cli.3.23.5.amd64
