@@ -90,6 +90,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 			newRmAll(varPath),
 			newMkdir(varPath),
 			newChown(varPath, int(cfg.Uid), int(cfg.Gid)),
+			newChown(target, int(cfg.Uid), int(cfg.Gid)),
 		)
 	}
 }
