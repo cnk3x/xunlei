@@ -1,6 +1,7 @@
 package xunlei
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -39,7 +40,7 @@ const (
 	FILE_PAN_XUNLEI_CLI = DIR_SYNOPKG_PKGDEST + "/bin/bin/xunlei-pan-cli-launcher." + runtime.GOARCH //启动器
 	FILE_INDEX_CGI      = DIR_SYNOPKG_PKGDEST + "/ui/index.cgi"                                      //CGI文件路径
 
-	DIR_VAR              = DIR_SYNOPKG_PKGROOT + "/var"                       //SYNOPKG_PKGROOT
+	DIR_VAR              = DIR_SYNOPKG_PKGDEST + "/var"                       //SYNOPKG_PKGROOT
 	FILE_PID             = DIR_VAR + "/" + SYNOPKG_PKGNAME + ".pid"           //进程文件
 	SOCK_LAUNCHER_LISTEN = DIR_VAR + "/" + SYNOPKG_PKGNAME + "-launcher.sock" //启动器监听地址
 	SOCK_DRIVE_LISTEN    = DIR_VAR + "/" + SYNOPKG_PKGNAME + ".sock"          //主程序监听地址
@@ -56,57 +57,36 @@ var (
 
 func Before(cfg Config) func(ctx context.Context) (func(), error) {
 	return func(ctx context.Context) (undo func(), err error) {
-		rmdir := func(p string) func() (undo func(), err error) {
-			return func() (undo func(), err error) {
-				err = os.RemoveAll(p)
-				return
-			}
-		}
+		u := utils.MakeUndoPool(&undo, &err)
+		defer u.ErrDefer()
 
-		mkdir := func(dirs ...string) func() (undo func(), err error) {
-			return func() (undo func(), err error) {
-				return sys.Mkdirs(ctx, dirs, 0777)
-			}
+		undo, err = mockSyno(ctx, cfg.Chroot)
+		if err != nil {
+			return
 		}
-
-		chown := func(dirs ...string) func() (undo func(), err error) {
-			return func() (undo func(), err error) {
-				uid, gid := int(cfg.Uid), int(cfg.Gid)
-				if gid == 0 && uid != 0 {
-					gid = uid
-				}
-				if uid != 0 {
-					for _, dir := range dirs {
-						err = os.Chown(dir, uid, gid)
-					}
-				}
-				return
-			}
-		}
-
-		makeSyno := func() func() (undo func(), err error) {
-			return mockSyno(ctx, cfg.Chroot)
-		}
+		u.Put(undo)
 
 		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
 		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
+		dirHome := filepath.Join(cfg.DirData, ".drive")
 
-		return utils.SeqExecWithUndo(
-			makeSyno(),
+		undo, err = sys.Mkdirs(ctx, append(cfg.DirDownload, target, varPath, dirHome), 0777)
+		if err != nil {
+			return
+		}
+		u.Put(undo)
 
-			mkdir(target),
-			chown(target),
+		dest := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
+		if err = spk.Download(ctx, cfg.SpkUrl, dest, cfg.ForceDownload); err != nil {
+			return
+		}
 
-			rmdir(varPath),
-			mkdir(varPath),
-			chown(varPath),
-
-			mkdir(cfg.DirDownload...),
-			chown(cfg.DirDownload...),
-
-			mkdir(cfg.DirData),
-			chown(cfg.DirData),
-		)
+		if uid, gid := cfg.Uid, cfg.Gid; uid != 0 || gid != 0 {
+			gid = cmp.Or(gid, uid)
+			sys.Chown(ctx, utils.Array(varPath, dirHome), uid, gid, false)
+			sys.Chown(ctx, utils.Array(cfg.DirData, target), uid, gid, true)
+		}
+		return
 	}
 }
 
@@ -118,14 +98,13 @@ func Run(cfg Config) func(ctx context.Context) error {
 		ctx, cancel := context.WithCancelCause(ctx)
 		defer cancel(fmt.Errorf("done"))
 
-		var dirDownload, dirData []string
-		err = utils.SeqExec(
-			func() (err error) { dirDownload, err = utils.NewRootPath(cfg.Chroot, cfg.DirDownload...); return },
-			func() (err error) { dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); return },
-			func() (err error) { return spk.Download(ctx, cfg.SpkUrl, DIR_SYNOPKG_PKGDEST, cfg.ForceDownload) },
-			func() (err error) { return os.MkdirAll(DIR_VAR, 0777) },
-		)
-		if err != nil {
+		var dirDownload []string
+		if dirDownload, err = utils.NewRootPath(cfg.Chroot, cfg.DirDownload...); err != nil {
+			return
+		}
+
+		var dirData []string
+		if dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); err != nil {
 			return
 		}
 
@@ -141,7 +120,6 @@ func Run(cfg Config) func(ctx context.Context) error {
 			),
 			cmdx.Dir(DIR_SYNOPKG_WORK),
 			cmdx.Env(envs),
-			// cmdx.Credential(cfg.Uid, cfg.Gid),
 			cmdx.LineErr(logPan("pan", "stderr")),
 			cmdx.LineOut(logPan("pan", "stdout")),
 			cmdx.OnStarted(func(c *cmdx.Cmd) error {
@@ -163,8 +141,13 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	mux := web.NewMux()
 	mux.Recoverer()
 
-	console := cmdx.LineWriter(logPan("pan", "cgi"))
-	defer console.Close()
+	c1 := cmdx.LineWriter(logPan("pan", "cgi1"))
+	defer c1.Close()
+
+	c2 := cmdx.LineWriter(logPan("pan", "cgi2"))
+	defer c2.Close()
+
+	//2026/01/18 04:26:58
 
 	mux.Handle("/webman/status",
 		web.FBlob(
@@ -179,8 +162,8 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 		Dir:    DIR_SYNOPKG_WORK,
 		Path:   FILE_INDEX_CGI,
 		Env:    env,
-		Logger: utils.LogStd(console),
-		Stderr: console,
+		Logger: utils.LogStd(c1),
+		Stderr: c2,
 	})
 
 	mux.Get("/", web.Redirect(CGI_PATH, true))
@@ -212,13 +195,11 @@ func mockEnv(dirData, dirDownload string) []string {
 	)
 }
 
-func mockSyno(ctx context.Context, root string) func() (undo func(), err error) {
-	return func() (undo func(), err error) {
-		return utils.SeqExecWithUndo(
-			mockSynoInfo(ctx, root),
-			authenticate_cgi.SaveFunc(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI)),
-		)
-	}
+func mockSyno(ctx context.Context, root string) (undo func(), err error) {
+	return utils.SeqExecWithUndo(
+		mockSynoInfo(ctx, root),
+		authenticate_cgi.SaveFunc(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI)),
+	)
 }
 
 func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err error) {
