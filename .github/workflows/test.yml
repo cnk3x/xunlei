@@ -10,7 +10,7 @@ jobs:
       - name: 设置时区
         run: |
           sudo ln -sf /usr/share/zoneinfo/Asia/Chongqing /etc/localtime
-          sudo echo "Asia/Chongqing" > /etc/timezone
+          echo "Asia/Chongqing" | sudo tee /etc/timezone > /dev/null
           echo "系统当前时区：$(cat /etc/timezone)"
           echo "系统当前时间：$(date)"
 
