@@ -56,41 +56,56 @@ var (
 
 func Before(cfg Config) func(ctx context.Context) (func(), error) {
 	return func(ctx context.Context) (undo func(), err error) {
-		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
-		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
-
-		newChown := func(path string, uid, gid int) func() (undo func(), err error) {
-			return func() (undo func(), err error) {
-				if gid == 0 && uid != 0 {
-					gid = uid
-				}
-				if uid != 0 {
-					err = os.Chown(path, uid, gid)
-				}
-				return
-			}
-		}
-
-		newMkdir := func(p string) func() (undo func(), err error) {
-			return func() (undo func(), err error) {
-				return sys.Mkdir(ctx, p, 0777)
-			}
-		}
-
-		newRmAll := func(p string) func() (undo func(), err error) {
+		rmdir := func(p string) func() (undo func(), err error) {
 			return func() (undo func(), err error) {
 				err = os.RemoveAll(p)
 				return
 			}
 		}
 
+		mkdir := func(dirs ...string) func() (undo func(), err error) {
+			return func() (undo func(), err error) {
+				return sys.Mkdirs(ctx, dirs, 0777)
+			}
+		}
+
+		chown := func(dirs ...string) func() (undo func(), err error) {
+			return func() (undo func(), err error) {
+				uid, gid := int(cfg.Uid), int(cfg.Gid)
+				if gid == 0 && uid != 0 {
+					gid = uid
+				}
+				if uid != 0 {
+					for _, dir := range dirs {
+						err = os.Chown(dir, uid, gid)
+					}
+				}
+				return
+			}
+		}
+
+		makeSyno := func() func() (undo func(), err error) {
+			return mockSyno(ctx, cfg.Chroot)
+		}
+
+		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
+		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
+
 		return utils.SeqExecWithUndo(
-			mockSyno(ctx, cfg.Chroot),
-			newMkdir(target),
-			newRmAll(varPath),
-			newMkdir(varPath),
-			newChown(varPath, int(cfg.Uid), int(cfg.Gid)),
-			newChown(target, int(cfg.Uid), int(cfg.Gid)),
+			makeSyno(),
+
+			mkdir(target),
+			chown(target),
+
+			rmdir(varPath),
+			mkdir(varPath),
+			chown(varPath),
+
+			mkdir(cfg.DirDownload...),
+			chown(cfg.DirDownload...),
+
+			mkdir(cfg.DirData),
+			chown(cfg.DirData),
 		)
 	}
 }
@@ -108,7 +123,6 @@ func Run(cfg Config) func(ctx context.Context) error {
 			func() (err error) { dirDownload, err = utils.NewRootPath(cfg.Chroot, cfg.DirDownload...); return },
 			func() (err error) { dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); return },
 			func() (err error) { return spk.Download(ctx, cfg.SpkUrl, DIR_SYNOPKG_PKGDEST, cfg.ForceDownload) },
-			func() (err error) { return utils.Eol(sys.Mkdirs(ctx, append(dirDownload, dirData...), 0777)) },
 			func() (err error) { return os.MkdirAll(DIR_VAR, 0777) },
 		)
 		if err != nil {
