@@ -33,6 +33,7 @@ type Options struct {
 //   - 执行顺序 root 启动 → 准备 chroot 监狱 → chroot 切换 → setegid/seteuid 降权 → 执行核心任务 → 恢复 root 权限
 func Exec(ctx context.Context, options ...Option) (err error) {
 	slog.InfoContext(ctx, "start boot")
+	defer slog.InfoContext(ctx, "stopped")
 
 	var opts Options
 	for _, option := range options {
