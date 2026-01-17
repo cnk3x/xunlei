@@ -10,21 +10,18 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"slices"
-	"strings"
 
 	"github.com/cnk3x/xunlei/pkg/utils"
+	"github.com/go-chi/chi/v5"
 )
 
-// Processor 定义中间件处理器函数类型，接收下一个处理器并返回包装后的处理器
-type Processor func(next http.Handler) http.Handler
+// Middleware 定义中间件处理器函数类型，接收下一个处理器并返回包装后的处理器
+type Middleware = func(http.Handler) http.Handler
 
 // Mux 表示一个HTTP请求多路复用器，支持中间件处理链
 type Mux struct {
-	cur        *http.ServeMux // 当前多路复用器
-	parent     *Mux           // 父级多路复用器，用于嵌套结构
-	processors []Processor    // 处理器链（中间件）
-	onShutdown func()         // 关闭时执行的回调函数
+	chi.Router        // 当前多路复用器
+	onShutdown func() // 关闭时执行的回调函数
 }
 
 // Router 接口定义路由的基本操作
@@ -34,83 +31,70 @@ type Router interface {
 
 // NewMux 创建一个新的Mux实例，默认包含Recoverer中间件
 func NewMux() *Mux {
-	return &Mux{cur: http.NewServeMux()}
+	return &Mux{Router: chi.NewMux()}
 }
 
 // OnShutDown 设置服务器关闭时的回调函数
 //   - fn: 服务器关闭时执行的函数
 func (mux *Mux) OnShutDown(fn func()) { mux.onShutdown = fn }
 
-// With 创建一个新的Mux实例，继承当前实例的父级和处理器，并可以添加新的处理器
-//   - processor: 要添加的处理器列表
-//
-// 返回一个新的Mux实例，其父级指向当前实例
-func (mux *Mux) With(processor ...Processor) *Mux { return &Mux{parent: mux} }
+func (mux *Mux) BasicAuth(user, pwd string) *Mux { mux.Use(BasicAuth(user, pwd)); return mux }
 
-func (mux *Mux) BasicAuth(user, pwd string) *Mux { return mux.With(BasicAuth(user, pwd)) }
+func (mux *Mux) Recoverer() *Mux { mux.Use(Recoverer); return mux }
 
-// Use 向当前mux添加中间件处理器到处理器链中
-//   - processor: 要添加的处理器列表
-func (mux *Mux) Use(processor ...Processor) { mux.processors = append(mux.processors, processor...) }
+// // Handle 注册HTTP处理器，根据是否有父级mux来决定注册位置
+// //   - pattern: 请求路径模式
+// //   - handler: HTTP处理器
+// //   - processors: 额外的处理器（中间件）
+// func (mux *Mux) Handle(pattern string, handler http.Handler) {
+// 	slog.Debug("web handle", "pattern", pattern, "handler", handler != nil, "parent", mux.parent != nil, "cur", mux.cur != nil)
+// 	if mux.parent != nil {
+// 		mux.parent.Handle(pattern, applyProcessors(handler, mux.middlewares...))
+// 	} else {
+// 		mux.cur.Handle(pattern, applyProcessors(handler, mux.middlewares...))
+// 	}
+// }
+// // Route 注册一个带有前缀模式和处理器的路由，允许通配符匹配。
+// // 如果前缀不以'*'结尾，则根据情况添加'*'或'/*'以实现路径前缀匹配。
+// //   - prefix: 要匹配的路由前缀（可选尾随'*'）
+// //   - handler: 路由匹配时执行的HTTP处理器
+// func (mux *Mux) Route(prefix string, handler http.Handler) {
+// 	if !strings.HasSuffix(prefix, "*") {
+// 		if strings.HasSuffix(prefix, "/") {
+// 			prefix += "*"
+// 		} else {
+// 			prefix += "/*"
+// 		}
+// 	}
+// 	mux.Handle(prefix, handler)
+// }
 
-func (mux *Mux) UseBasicAuth(user, pwd string) { mux.Use(BasicAuth(user, pwd)) }
+// // Get 注册GET请求处理器
+// //   - pattern: GET请求路径模式
+// //   - handler: HTTP处理器
+// //   - processors: 额外的处理器（中间件）
+// func (mux *Mux) Get(pattern string, handler http.Handler) {
+// 	mux.Handle("GET "+pattern, handler)
+// }
 
-func (mux *Mux) UseRecoverer() { mux.Use(Recoverer) }
+// // Post 注册POST请求处理器
+// //   - pattern: POST请求路径模式
+// //   - handler: HTTP处理器
+// //   - processors: 额外的处理器（中间件）
+// func (mux *Mux) Post(pattern string, handler http.Handler) {
+// 	mux.Handle("POST "+pattern, handler)
+// }
 
-// Handle 注册HTTP处理器，根据是否有父级mux来决定注册位置
-//   - pattern: 请求路径模式
-//   - handler: HTTP处理器
-//   - processors: 额外的处理器（中间件）
-func (mux *Mux) Handle(pattern string, handler http.Handler) {
-	slog.Debug("web handle", "pattern", pattern, "handler", handler != nil, "parent", mux.parent != nil, "cur", mux.cur != nil)
-	if mux.parent != nil {
-		mux.parent.Handle(pattern, applyProcessors(handler, mux.processors...))
-	} else {
-		mux.cur.Handle(pattern, applyProcessors(handler, mux.processors...))
-	}
-}
-
-// Route 注册一个带有前缀模式和处理器的路由，允许通配符匹配。
-// 如果前缀不以'*'结尾，则根据情况添加'*'或'/*'以实现路径前缀匹配。
-//   - prefix: 要匹配的路由前缀（可选尾随'*'）
-//   - handler: 路由匹配时执行的HTTP处理器
-func (mux *Mux) Route(prefix string, handler http.Handler) {
-	if !strings.HasSuffix(prefix, "*") {
-		if strings.HasSuffix(prefix, "/") {
-			prefix += "*"
-		} else {
-			prefix += "/*"
-		}
-	}
-	mux.Handle(prefix, handler)
-}
-
-// Get 注册GET请求处理器
-//   - pattern: GET请求路径模式
-//   - handler: HTTP处理器
-//   - processors: 额外的处理器（中间件）
-func (mux *Mux) Get(pattern string, handler http.Handler) {
-	mux.Handle("GET "+pattern, handler)
-}
-
-// Post 注册POST请求处理器
-//   - pattern: POST请求路径模式
-//   - handler: HTTP处理器
-//   - processors: 额外的处理器（中间件）
-func (mux *Mux) Post(pattern string, handler http.Handler) {
-	mux.Handle("POST "+pattern, handler)
-}
-
-// ServeHTTP 实现http.Handler接口，处理HTTP请求
-func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if mux.parent != nil {
-		mux.parent.ServeHTTP(w, r)
-	} else if mux.cur != nil {
-		mux.cur.ServeHTTP(w, r)
-	} else {
-		http.Error(w, "mux is not defined", http.StatusInternalServerError)
-	}
-}
+// // ServeHTTP 实现http.Handler接口，处理HTTP请求
+// func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// 	if mux.parent != nil {
+// 		mux.parent.ServeHTTP(w, r)
+// 	} else if mux.cur != nil {
+// 		mux.cur.ServeHTTP(w, r)
+// 	} else {
+// 		http.Error(w, "mux is not defined", http.StatusInternalServerError)
+// 	}
+// }
 
 // Run 启动HTTP服务器并监听指定地址
 //   - ctx: 上下文对象
@@ -242,7 +226,7 @@ func Recoverer(next http.Handler) http.Handler {
 //   - password: 密码
 //
 // 返回认证处理器
-func BasicAuth(username, password string) Processor {
+func BasicAuth(username, password string) Middleware {
 	if password != "" {
 		if username == "" {
 			username = "admin"
@@ -270,18 +254,4 @@ func BasicAuth(username, password string) Processor {
 func Address[T utils.UintT | utils.IntT](ip net.IP, port T) string {
 	sIp := ip.String()
 	return net.JoinHostPort(utils.Iif(sIp == "<nil>", "", sIp), utils.String(port))
-}
-
-// applyProcessors 按逆序应用处理器链
-//   - h: 初始处理器
-//   - mw: 处理器列表
-//
-// 返回包装后的处理器
-func applyProcessors(h http.Handler, mw ...Processor) http.Handler {
-	for _, m := range slices.Backward(mw) {
-		if m != nil {
-			h = m(h)
-		}
-	}
-	return h
 }

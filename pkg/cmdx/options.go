@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"slices"
 	"strings"
 	"syscall"
@@ -14,10 +13,10 @@ import (
 	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
-type Option func(*exec.Cmd) (Undo, error)
+type Option func(*Cmd) (Undo, error)
 
 func Options(options ...Option) Option {
-	return func(c *exec.Cmd) (undo Undo, err error) {
+	return func(c *Cmd) (undo Undo, err error) {
 		pUndo := utils.MakeUndoPool(&undo, &err)
 		defer pUndo.ErrDefer()
 		for _, option := range options {
@@ -32,7 +31,7 @@ func Options(options ...Option) Option {
 }
 
 func ProcAttr(options ...Option) Option {
-	attrInit := May(func(c *exec.Cmd) {
+	attrInit := May(func(c *Cmd) {
 		if c.SysProcAttr == nil {
 			c.SysProcAttr = &syscall.SysProcAttr{}
 		}
@@ -41,9 +40,10 @@ func ProcAttr(options ...Option) Option {
 }
 
 func Credential(uid, gid uint32) Option {
-	return ProcAttr(May(func(c *exec.Cmd) error {
+	var currentUid = os.Getuid()
+	return ProcAttr(May(func(c *Cmd) error {
 		if uid != 0 || gid != 0 {
-			if !IsRoot() {
+			if currentUid != 0 {
 				return fmt.Errorf("%s: root required, current uid: %d", os.ErrPermission, currentUid)
 			}
 			c.SysProcAttr.Credential = &syscall.Credential{Uid: uid, Gid: gid, NoSetGroups: true}
@@ -53,21 +53,24 @@ func Credential(uid, gid uint32) Option {
 }
 
 func Args(args ...string) Option {
-	return May(func(c *exec.Cmd) { c.Args = append(c.Args[:1], args...) })
+	return May(func(c *Cmd) { c.Args = append(c.Args[:1], args...) })
 }
 
-func Dir(dir string) Option     { return May(func(c *exec.Cmd) { c.Dir = dir }) }
-func Env(env []string) Option   { return May(func(c *exec.Cmd) { c.Env = env }) }
-func Stderr(w io.Writer) Option { return May(func(c *exec.Cmd) { c.Stderr = w }) }
-func Stdout(w io.Writer) Option { return May(func(c *exec.Cmd) { c.Stdout = w }) }
-func Stdin(r io.Reader) Option  { return May(func(c *exec.Cmd) { c.Stdin = r }) }
+func Dir(dir string) Option               { return May(func(c *Cmd) { c.Dir = dir }) }
+func Env(env []string) Option             { return May(func(c *Cmd) { c.Env = env }) }
+func Stderr(w io.Writer) Option           { return May(func(c *Cmd) { c.Stderr = w }) }
+func Stdout(w io.Writer) Option           { return May(func(c *Cmd) { c.Stdout = w }) }
+func Stdin(r io.Reader) Option            { return May(func(c *Cmd) { c.Stdin = r }) }
+func PreStart(f func(*Cmd) error) Option  { return May(func(c *Cmd) { c.preStart = f }) }
+func OnStarted(f func(*Cmd) error) Option { return May(func(c *Cmd) { c.onStarted = f }) }
+func OnExit(f func(*Cmd) error) Option    { return May(func(c *Cmd) { c.onExit = f }) }
 
 func LogStd() Option {
-	return May(func(c *exec.Cmd) { c.Stderr, c.Stdout = os.Stderr, os.Stdout })
+	return May(func(c *Cmd) { c.Stderr, c.Stdout = os.Stderr, os.Stdout })
 }
 
 func LineOut(lineRecv func(string)) Option {
-	return May(func(c *exec.Cmd) Undo {
+	return May(func(c *Cmd) Undo {
 		w := LineWriter(lineRecv)
 		c.Stdout, c.Stderr = w, w
 		return eUndo(w.Close)
@@ -75,7 +78,7 @@ func LineOut(lineRecv func(string)) Option {
 }
 
 func LineErr(lineRecv func(string)) Option {
-	return May(func(c *exec.Cmd) Undo {
+	return May(func(c *Cmd) Undo {
 		w := LineWriter(lineRecv)
 		c.Stderr = w
 		return eUndo(w.Close)
@@ -92,8 +95,8 @@ func SlogDebug(prefix string) Option {
 	return Options(le, lo)
 }
 
-func May[O IOption](option O) func(*exec.Cmd) (undo Undo, err error) {
-	return func(c *exec.Cmd) (undo Undo, err error) {
+func May[O IOption](option O) func(*Cmd) (undo Undo, err error) {
+	return func(c *Cmd) (undo Undo, err error) {
 		return apply(option, c)
 	}
 }
@@ -102,23 +105,23 @@ type Undo = func()
 
 func eUndo[E any](f func() E) Undo { return func() { _ = f() } }
 
-func apply[MO IOption](option MO, t *exec.Cmd) (undo Undo, err error) {
-	if apply, ok := any(option).(func(*exec.Cmd)); ok {
+func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
+	if apply, ok := any(option).(func(*Cmd)); ok {
 		apply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*exec.Cmd) error); ok {
+	if apply, ok := any(option).(func(*Cmd) error); ok {
 		err = apply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*exec.Cmd) Undo); ok {
+	if apply, ok := any(option).(func(*Cmd) Undo); ok {
 		undo = apply(t)
 		return
 	}
 
-	if apply, ok := any(option).(func(*exec.Cmd) (Undo, error)); ok {
+	if apply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
 		undo, err = apply(t)
 		return
 	}
@@ -127,5 +130,5 @@ func apply[MO IOption](option MO, t *exec.Cmd) (undo Undo, err error) {
 }
 
 type IOption interface {
-	~func(*exec.Cmd) (Undo, error) | ~func(*exec.Cmd) Undo | ~func(*exec.Cmd) error | ~func(*exec.Cmd)
+	~func(*Cmd) (Undo, error) | ~func(*Cmd) Undo | ~func(*Cmd) error | ~func(*Cmd)
 }

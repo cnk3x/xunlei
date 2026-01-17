@@ -24,6 +24,8 @@ func MakeUndoPool(undo *func(), autoUndoIfErr *error) (r struct {
 		}
 	}
 
-	*undo = r.Run
+	if undo != nil {
+		*undo = r.Run
+	}
 	return
 }

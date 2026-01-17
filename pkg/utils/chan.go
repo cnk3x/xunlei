@@ -101,3 +101,12 @@ func After[T any, F ft[T]](done <-chan T, f F, cBreaks ...<-chan struct{}) {
 type ft[T any] interface {
 	~func() | ~func() error | ~func(T) | ~func(T) error
 }
+
+func BackExec(exec func()) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		exec()
+	}()
+	return done
+}

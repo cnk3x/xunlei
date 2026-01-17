@@ -1,6 +1,7 @@
 package xunlei
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -103,8 +104,8 @@ func NewBefore(cfg Config) func(ctx context.Context) error {
 }
 
 func Run(ctx context.Context, cfg Config) (err error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(fmt.Errorf("done"))
 
 	defer os.RemoveAll(VAR_DIR)
 
@@ -126,12 +127,6 @@ func Run(ctx context.Context, cfg Config) (err error) {
 
 	envs := mockEnv(dirDownload, dirData[0])
 
-	webDone, e := mockWeb(ctx, envs, cfg)
-	if err = e; err != nil {
-		return
-	}
-	utils.After(webDone, cancel)
-
 	slog.DebugContext(ctx, "app start")
 	args := []string{"-launcher_listen", "unix://" + LAUNCHER_LISTEN_PATH, "-pid", PID_FILE}
 
@@ -152,15 +147,21 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		cmdx.Credential(cfg.Uid, cfg.Gid),
 		cmdx.LineErr(logPan("pan", "stderr")),
 		cmdx.LineOut(logPan("pan", "stdout")),
+		cmdx.OnStarted(func(c *cmdx.Cmd) error {
+			utils.BackExec(func() { cancel(cmp.Or(webRun(ctx, envs, cfg), fmt.Errorf("web done"))) })
+			return nil
+		}),
 	)
 }
 
-func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan struct{}, err error) {
-	ctx = log.Prefix(ctx, "mock")
+func webRun(ctx context.Context, env []string, cfg Config) (err error) {
+	ctx = log.Prefix(ctx, "web")
 	mux := web.NewMux()
-	mux.UseRecoverer()
+	mux.Recoverer()
 
 	console := cmdx.LineWriter(logPan("pan", "cgi"))
+	defer console.Close()
+
 	hCgi := &cgi.Handler{
 		Dir:    fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
 		Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
@@ -176,16 +177,14 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 		),
 	)
 
-	mux.Handle("/", web.Redirect(CGI_URL, true))
-	mux.Handle("/web", web.Redirect(CGI_URL, true))
-	mux.Handle("/webman", web.Redirect(CGI_URL, true))
-	mux.Handle(UPDATE_URL, web.Blob(fmt.Sprintf("arch: %s\nversion: \"0.0.1\"\naccept: [\"9.9.9\"]", runtime.GOARCH), `text/vnd.yaml`, 200))
+	mux.Get("/", web.Redirect(CGI_URL, true))
+	mux.Get("/web", web.Redirect(CGI_URL, true))
+	mux.Get("/webman", web.Redirect(CGI_URL, true))
+	mux.Get(UPDATE_URL, web.Blob(fmt.Sprintf("arch: %s\nversion: \"0.0.1\"\naccept: [\"9.9.9\"]", runtime.GOARCH), `text/vnd.yaml`, 200))
 	mux.Handle("/webman/login.cgi", web.Blob(fmt.Sprintf(`{"SynoToken":%q,"result":"success","success":true}`, utils.RandText(13)), "application/json", http.StatusOK))
-	mux.BasicAuth(cfg.DashboardUsername, cfg.DashboardPassword).Route(CGI_URL, hCgi)
+	mux.With(web.BasicAuth(cfg.DashboardUsername, cfg.DashboardPassword)).Mount(CGI_URL, hCgi)
 
-	webDone = mux.Start(ctx, web.Address(cfg.Ip, cfg.Port))
-	utils.After(webDone, utils.Fne(console.Close))
-	return
+	return mux.Run(ctx, web.Address(cfg.Ip, cfg.Port))
 }
 
 func mockEnv(dirDownload []string, dirData string) []string {
