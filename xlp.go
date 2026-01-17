@@ -56,40 +56,32 @@ var (
 
 func Before(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		if err = mockSyno(cfg.Chroot); err != nil {
-			return
-		}
-
-		return os.RemoveAll(filepath.Join(cfg.Chroot, DIR_VAR))
+		return utils.SeqExec(
+			func() error { return mockSyno(cfg.Chroot) },
+			func() error { return os.MkdirAll(DIR_SYNOPKG_PKGDEST, 0777) },
+			func() error { return os.Chmod(DIR_SYNOPKG_PKGDEST, 0777) },
+			func() error { return os.RemoveAll(filepath.Join(cfg.Chroot, DIR_VAR)) },
+		)
 	}
 }
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
+		slog.DebugContext(ctx, "app start")
+
 		ctx, cancel := context.WithCancelCause(ctx)
 		defer cancel(fmt.Errorf("done"))
 
-		slog.DebugContext(ctx, "app start")
-
-		dirDownload, e := utils.NewRootPath(cfg.Chroot, cfg.DirDownload...)
-		if err = e; err != nil {
+		var dirDownload, dirData []string
+		err = utils.SeqExec(
+			func() (err error) { dirDownload, err = utils.NewRootPath(cfg.Chroot, cfg.DirDownload...); return },
+			func() (err error) { dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); return },
+			func() (err error) { return spk.Download(ctx, cfg.SpkUrl, DIR_SYNOPKG_PKGDEST, cfg.ForceDownload) },
+			func() (err error) { return utils.Eol(sys.Mkdirs(ctx, append(dirDownload, dirData...), 0777)) },
+		)
+		if err != nil {
 			return
 		}
-
-		dirData, e := utils.NewRootPath(cfg.Chroot, cfg.DirData)
-		if err = e; err != nil {
-			return
-		}
-
-		if err = spk.Download(ctx, cfg.SpkUrl, DIR_SYNOPKG_PKGDEST, cfg.ForceDownload); err != nil {
-			return
-		}
-
-		var undo sys.Undo
-		if undo, err = sys.Mkdirs(ctx, append(dirDownload, dirData...), 0777); err != nil {
-			return
-		}
-		defer undo()
 
 		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
 		return cmdx.Exec(
@@ -226,64 +218,3 @@ func logPan(module, prefix string) func(string) {
 		slog.LogAttrs(context.Background(), l, prefix+s, p, t)
 	}
 }
-
-// func rChown(ctx context.Context, root string, uid, gid uint32) error {
-// 	if uid == 0 {
-// 		return nil
-// 	}
-// 	slog.DebugContext(ctx, fmt.Sprintf("chown -r %d:%d %s", uid, gid, root))
-// 	return filepath.WalkDir(root, func(path string, _ fs.DirEntry, err error) error {
-// 		if err == nil {
-// 			select {
-// 			case <-ctx.Done():
-// 				return fs.SkipAll
-// 			default:
-// 				err = syscall.Chown(path, int(uid), int(gid))
-// 				slog.Log(ctx, log.ErrDebug(err), "chown", "uid", uid, "gid", gid, "path", path, "err", err)
-// 			}
-// 		}
-// 		return err
-// 	})
-// }
-//
-// func panRun(ctx context.Context, cfg Config, env []string) (err error) {
-// 	// /data/.drive/bin/xunlei-pan-cli.3.23.5.amd64
-// 	// args:[--logsize 10MB --pid /var/packages/pan-xunlei-com/target/var/pan-xunlei-com.pid.child --info /var/packages/pan-xunlei-com/target/bin/bin/info.file -q run runner]
-// 	dataRoot := "/" + utils.Eon(filepath.Rel(cfg.Chroot, cfg.DirData))
-// 	cliFmt := "xunlei-pan-cli.{version}." + runtime.GOARCH
-// 	name, version, find := findVersionBin(filepath.Join(dataRoot, ".drive/bin"), cliFmt)
-// 	if !find {
-// 		name, version, find = findVersionBin(filepath.Join(SYNOPKG_PKGDEST, "/bin/bin"), cliFmt)
-// 		if !find {
-// 			return fmt.Errorf("not found xunlei-pan-cli")
-// 		}
-// 		if err = fo.OpenWrite(filepath.Join(dataRoot, ".drive/bin", ".version"), fo.Content(version), fo.Perm(0666), fo.DirPerm(0777)); err != nil {
-// 			return
-// 		}
-// 		newName := filepath.Join(dataRoot, ".drive/bin", filepath.Base(name))
-// 		err = fo.OpenWrite(newName, fo.Content(version), fo.Perm(0666), fo.DirPerm(0777))
-// 		if err != nil {
-// 			return
-// 		}
-// 		name = newName
-// 	}
-// 	args := []string{
-// 		"--logsize", "10MB",
-// 		"--pid", PID_FILE + ".child",
-// 		"--info", filepath.Join(SYNOPKG_PKGDEST, "bin/bin/info.file"),
-// 		"-q", "run", "runner",
-// 	}
-// 	// _ = args
-// 	// args = []string{"--help"}
-// 	return cmdRun(log.Prefix(ctx, "pan"), name, args, filepath.Join(SYNOPKG_PKGDEST, "bin"), env, cfg.Uid, cfg.Gid)
-// }
-// func findVersionBin(dir, name string) (bin, version string, find bool) {
-// 	version = utils.Cats(filepath.Join(dir, ".version"), filepath.Join(dir, "version"))
-// 	if version == "" {
-// 		return "", "", false
-// 	}
-// 	repl := strings.NewReplacer("{version}", version, "{arch}", runtime.GOARCH)
-// 	bin = filepath.Join(dir, repl.Replace(name))
-// 	find = utils.PathExists(bin)
-// 	return
-// }

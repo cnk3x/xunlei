@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
@@ -38,7 +39,7 @@ func Exec(ctx context.Context, options ...Option) (err error) {
 		option(&opts)
 	}
 
-	undo, e := seqExec(
+	undo, e := utils.SeqExecWithUndo(
 		func() (sys.Undo, error) { return sys.Mounts(ctx, opts.mounts) },           //mounts
 		func() (sys.Undo, error) { return sys.BindRs(ctx, opts.root, opts.binds) }, //binds
 		func() (sys.Undo, error) { return sys.LinkRs(ctx, opts.root, opts.links) }, //links
@@ -72,21 +73,5 @@ func Exec(ctx context.Context, options ...Option) (err error) {
 			return
 		}
 	}
-	return
-}
-
-func seqExec(fns ...func() (undo sys.Undo, err error)) (undo sys.Undo, err error) {
-	var undos []sys.Undo
-	undo = sys.Undos(&undos)
-	defer sys.ExecUndo(undo, &err)
-
-	for _, fn := range fns {
-		u, e := fn()
-		if err = e; err != nil {
-			return
-		}
-		undos = append(undos, u)
-	}
-
 	return
 }

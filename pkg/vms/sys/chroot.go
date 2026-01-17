@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/log"
+	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
 // chroot & run
@@ -34,7 +35,7 @@ func Chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 	}
 
 	defer func() {
-		err = seqExec(
+		err = utils.SeqExec(
 			func() error { return syscall.Fchdir(rfd) },
 			func() error { return syscall.Chroot(".") },
 			func() error { return syscall.Chdir(wd) },
@@ -54,13 +55,4 @@ func Chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 		<-ctx.Done()
 	}
 	return
-}
-
-func seqExec(fns ...func() error) error {
-	for _, fn := range fns {
-		if err := fn(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

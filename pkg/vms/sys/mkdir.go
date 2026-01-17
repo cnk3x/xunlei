@@ -51,12 +51,12 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 		}
 	}
 
-	switch {
-	case ok:
-		// slog.DebugContext(ctx, "mkdir done", "dir", dir)
-	default:
-		slog.DebugContext(ctx, "mkdir skip", "dir", dir, "cause", "directory exists")
-	}
+	// switch {
+	// case ok:
+	// 	slog.DebugContext(ctx, "mkdir done", "dir", dir)
+	// default:
+	// 	slog.DebugContext(ctx, "mkdir skip", "dir", dir, "cause", "directory exists")
+	// }
 	return
 }
 
