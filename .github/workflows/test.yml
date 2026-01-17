@@ -16,7 +16,9 @@ jobs:
 
       - name: 检出代码
         uses: actions/checkout@v6
-        with: { repository: cnk3x/xunlei, ref: "${{ github.ref }}" }
+        with:
+          repository: cnk3x/xunlei
+          ref: "${{ github.ref }}"
 
       - name: 设置版本
         id: version
@@ -32,7 +34,7 @@ jobs:
           echo "v_date=${v_date}" >> $GITHUB_OUTPUT
 
           v_test="${v_xlp}-test-${v_date}"
-          echo "v_test=${v_test} >> $GITHUB_OUTPUT
+          echo "v_test=${v_test}" >> $GITHUB_OUTPUT
 
           echo "v_xlp: ${v_xlp}"
           echo "v_date: ${v_date}"
@@ -40,14 +42,17 @@ jobs:
 
       - name: 配置环境
         uses: actions/setup-go@v6
-        with: { go-version: "stable" }
+        with:
+          go-version: "stable"
 
       - name: 编译程序
         run: |
           GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
           GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
-        env: { CGO_ENABLED: 0, GOOS: linux }
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3

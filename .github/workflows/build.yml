@@ -48,14 +48,17 @@ jobs:
 
       - name: 配置环境
         uses: actions/setup-go@v6
-        with: { go-version: ">=1.25.0" }
+        with:
+          go-version: ">=1.25.0"
 
       - name: 编译程序
         run: |
           GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
           GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
-        env: { CGO_ENABLED: 0, GOOS: linux }
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
@@ -87,7 +90,8 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 整理产物
-        env: { v_xlp: "${{ steps.version.outputs.v_xlp }}" }
+        env:
+          v_xlp: "${{ steps.version.outputs.v_xlp }}"
         run: |
           cd ./artifacts
           mv xlp-amd64 xlp
@@ -98,7 +102,8 @@ jobs:
 
       - name: 发布上传
         uses: softprops/action-gh-release@v2
-        env: { GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}" }
+        env:
+          GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}"
         with:
           draft: true
           name: "v${{ steps.version.outputs.v_xlp }}"
