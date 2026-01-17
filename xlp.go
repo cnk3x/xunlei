@@ -62,7 +62,7 @@ func NewRun(cfg Config) func(ctx context.Context) error {
 
 func NewBefore(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		_ = cmdx.ShellFile(ctx, utils.Eon(os.Executable())+".sh")
+		_ = cmdx.FileShell(ctx, utils.Eon(os.Executable())+"_before.sh")
 
 		libDir := filepath.Join(cfg.Chroot, "lib")
 		for _, dir := range append(cfg.DirDownload, cfg.DirData, filepath.Join(cfg.Chroot, VAR_DIR), libDir) {
@@ -156,7 +156,8 @@ func Run(ctx context.Context, cfg Config) (err error) {
 		cmdx.Dir(SYNOPKG_PKGDEST+"/bin"),
 		cmdx.Env(envs),
 		cmdx.Credential(cfg.Uid, cfg.Gid),
-		cmdx.LineRead(logPan("pan")),
+		cmdx.LineErr(logPan("pan", "stderr")),
+		cmdx.LineOut(logPan("pan", "stdout")),
 	)
 }
 
@@ -165,11 +166,13 @@ func mockWeb(ctx context.Context, env []string, cfg Config) (webDone <-chan stru
 	mux := web.NewMux()
 	mux.UseRecoverer()
 
-	console := cmdx.LineWriter(logPan("cgi"))
+	console := cmdx.LineWriter(logPan("pan", "cgi"))
 	hCgi := &cgi.Handler{
-		Dir:  fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
-		Path: fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
-		Env:  env, Logger: utils.LogStd(console), Stderr: console,
+		Dir:    fmt.Sprintf("%s/bin", SYNOPKG_PKGDEST),
+		Path:   fmt.Sprintf("%s/ui/index.cgi", SYNOPKG_PKGDEST),
+		Env:    env,
+		Logger: utils.LogStd(console),
+		Stderr: console,
 	}
 
 	mux.Handle("/webman/status",
@@ -232,11 +235,14 @@ func rChown(ctx context.Context, root string, uid, gid uint32) error {
 	})
 }
 
-func logPan(prefix string) func(string) {
+func logPan(module, prefix string) func(string) {
 	var l slog.Level
-	p := log.PrefixAttr(prefix)
+	p := log.PrefixAttr(module)
 	// 2026-01-16T22:08:13.883171573+08:00 INFO|WARNING|ERROR
 	r := regexp.MustCompile(`([0-9T:.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
+	if prefix != "" {
+		prefix = fmt.Sprintf("[%s] ", prefix)
+	}
 	return func(s string) {
 		var t slog.Attr
 		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
@@ -248,7 +254,7 @@ func logPan(prefix string) func(string) {
 			}
 			s = s[len(matches[0]):]
 		}
-		slog.LogAttrs(context.Background(), l, s, p, t)
+		slog.LogAttrs(context.Background(), l, prefix+s, p, t)
 	}
 }
 

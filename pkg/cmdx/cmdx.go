@@ -12,7 +12,7 @@ var currentUid = os.Getuid()
 
 func IsRoot() bool { return currentUid == 0 }
 
-func Exec(ctx context.Context, name string, options ...CmdOption) (err error) {
+func Exec(ctx context.Context, name string, options ...Option) (err error) {
 	c := exec.CommandContext(ctx, name)
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
@@ -23,6 +23,7 @@ func Exec(ctx context.Context, name string, options ...CmdOption) (err error) {
 			closer()
 		}
 	}()
+
 	for _, apply := range options {
 		closer, err := apply(c)
 		if err != nil {
