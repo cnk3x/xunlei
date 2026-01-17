@@ -39,12 +39,12 @@ func RunAs(ctx context.Context, uid, gid int, run func() error) error {
 	if err := syscall.Setegid(gid); err != nil {
 		return fmt.Errorf("RunAs: 切换GID(%d)失败：%w", gid, err)
 	}
-	slog.DebugContext(ctx, "RunAs: 成功切换GID", "gid", gid)
+	slog.InfoContext(ctx, "RunAs: 成功切换GID", "gid", gid)
 
 	if err := syscall.Seteuid(uid); err != nil {
 		return fmt.Errorf("RunAs: 切换UID(%d)失败：%w", uid, err)
 	}
-	slog.DebugContext(ctx, "RunAs: 成功切换UID", "uid", uid)
+	slog.InfoContext(ctx, "RunAs: 成功切换UID", "uid", uid)
 
 	return run()
 }

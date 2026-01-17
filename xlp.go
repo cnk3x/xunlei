@@ -55,18 +55,41 @@ var (
 )
 
 func Before(cfg Config) func(ctx context.Context) (func(), error) {
-	return func(ctx context.Context) (func(), error) {
+	return func(ctx context.Context) (undo func(), err error) {
 		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
 		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
 
-		if err := os.RemoveAll(varPath); err != nil {
-			return nil, err
+		newChown := func(path string, uid, gid int) func() (undo func(), err error) {
+			return func() (undo func(), err error) {
+				if gid == 0 && uid != 0 {
+					gid = uid
+				}
+				if uid != 0 {
+					err = os.Chown(path, uid, gid)
+				}
+				return
+			}
+		}
+
+		newMkdir := func(p string) func() (undo func(), err error) {
+			return func() (undo func(), err error) {
+				return sys.Mkdir(ctx, p, 0777)
+			}
+		}
+
+		newRmAll := func(p string) func() (undo func(), err error) {
+			return func() (undo func(), err error) {
+				err = os.RemoveAll(p)
+				return
+			}
 		}
 
 		return utils.SeqExecWithUndo(
 			mockSyno(ctx, cfg.Chroot),
-			func() (undo func(), err error) { return sys.Mkdir(ctx, target, 0777) },
-			func() (undo func(), err error) { return sys.Mkdir(ctx, varPath, 0777) },
+			newMkdir(target),
+			newRmAll(varPath),
+			newMkdir(varPath),
+			newChown(varPath, int(cfg.Uid), int(cfg.Gid)),
 		)
 	}
 }

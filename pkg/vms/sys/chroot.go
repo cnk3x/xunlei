@@ -47,6 +47,7 @@ func Chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 		return
 	}
 
+	slog.DebugContext(ctx, "run start")
 	if err = run(ctx); err != nil {
 		slog.DebugContext(ctx, "run done", "err", err.Error())
 	}
