@@ -13,7 +13,7 @@ import (
 	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
-type Option func(*Cmd) (Undo, error)
+type Option = func(*Cmd) (Undo, error)
 
 func Options(options ...Option) Option {
 	return func(c *Cmd) (undo Undo, err error) {
@@ -21,7 +21,7 @@ func Options(options ...Option) Option {
 		defer pUndo.ErrDefer()
 		for _, option := range options {
 			var closer Undo
-			if closer, err = apply(option, c); err != nil {
+			if closer, err = option(c); err != nil {
 				return
 			}
 			pUndo.Put(closer)
@@ -124,13 +124,8 @@ func eUndo[E any](f func() E) Undo { return func() { _ = f() } }
 func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
 	undo = func() {}
 
-	if optApply, ok := any(option).(func(*Cmd)); ok {
-		optApply(t)
-		return
-	}
-
-	if optApply, ok := any(option).(func(*Cmd) error); ok {
-		err = optApply(t)
+	if optApply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
+		undo, err = optApply(t)
 		return
 	}
 
@@ -139,8 +134,13 @@ func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
 		return
 	}
 
-	if optApply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
-		undo, err = optApply(t)
+	if optApply, ok := any(option).(func(*Cmd) error); ok {
+		err = optApply(t)
+		return
+	}
+
+	if optApply, ok := any(option).(func(*Cmd)); ok {
+		optApply(t)
 		return
 	}
 
@@ -149,5 +149,5 @@ func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
 }
 
 type IOption interface {
-	~func(*Cmd) (Undo, error) | ~func(*Cmd) Undo | ~func(*Cmd) error | ~func(*Cmd)
+	~func(*Cmd) | ~func(*Cmd) error | ~func(*Cmd) Undo | ~func(*Cmd) (Undo, error)
 }

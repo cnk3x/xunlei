@@ -51,7 +51,7 @@ func main() {
 		vms.Before(xunlei.Before(cfg)),
 		vms.Run(xunlei.Run(cfg)),
 		vms.Debug(cfg.Debug),
-
+		vms.User(cfg.Uid, cfg.Gid),
 		vms.Root(cfg.Chroot),
 		vms.Binds("/lib", "/bin", "/etc/ssl"),
 		vms.Links("/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),

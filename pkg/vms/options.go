@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
@@ -11,7 +12,9 @@ func Root(root string) Option { return func(ro *Options) { ro.root = root } }
 
 func Run(run func(ctx context.Context) error) Option { return func(ro *Options) { ro.run = run } }
 
-func User(uid, gid int) Option { return func(ro *Options) { ro.uid, ro.gid = uid, gid } }
+func User[U, G utils.IntT | utils.UintT](uid U, gid G) Option {
+	return func(ro *Options) { ro.uid, ro.gid = int(uid), int(gid) }
+}
 
 func Debug(debug ...bool) Option {
 	return func(ro *Options) { ro.debug = len(debug) == 0 || debug[0] }
