@@ -120,8 +120,8 @@ func Run(cfg Config) func(ctx context.Context) error {
 			),
 			cmdx.Dir(DIR_SYNOPKG_WORK),
 			cmdx.Env(envs),
-			cmdx.LineErr(logPan("pan", "stderr")),
-			cmdx.LineOut(logPan("pan", "stdout")),
+			cmdx.LineErr(logPan(ctx, "[stderr] ")),
+			cmdx.LineOut(logPan(ctx, "[stdout] ")),
 			cmdx.OnStarted(func(c *cmdx.Cmd) error {
 				utils.BackExec(func() {
 					if err := webRun(ctx, envs, cfg); err != nil {
@@ -141,26 +141,6 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	mux := web.NewMux()
 	mux.Recoverer()
 
-	c1 := cmdx.LineWriter(logPan("pan", "cgi"))
-	defer c1.Close()
-
-	c2 := cmdx.LineWriter(func() func(s string) {
-		r := regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+`)
-		return func(s string) {
-			var t slog.Attr
-			if matches := r.FindStringSubmatch(s); len(matches) > 0 {
-				if d, e := time.Parse("2026/01/16 22:08:13", matches[1]); e == nil {
-					t = slog.Time(slog.TimeKey, d)
-				} else {
-					t = slog.String("pan_time", matches[1])
-				}
-				s = s[len(matches[0]):]
-			}
-			slog.LogAttrs(ctx, slog.LevelDebug, "[cgi] [err] "+s, log.PrefixAttr("pan"), t)
-		}
-	}())
-	defer c2.Close()
-
 	mux.Handle("/webman/status",
 		web.FBlob(
 			func() (string, error) { return "hello xlp, " + time.Now().Format(time.RFC3339), nil },
@@ -168,14 +148,19 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 		),
 	)
 
-	const CGI_PATH = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/index.cgi/" //
+	c1 := cmdx.LineWriter(logPan(ctx, "[cgi] "))
+	defer c1.Close()
 
+	c2 := cmdx.LineWriter(logErrCgi(ctx))
+	defer c2.Close()
+
+	const CGI_PATH = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/index.cgi/"
 	mux.With(web.BasicAuth(cfg.DashboardUsername, cfg.DashboardPassword)).Mount(CGI_PATH, &cgi.Handler{
 		Dir:    DIR_SYNOPKG_WORK,
 		Path:   FILE_INDEX_CGI,
 		Env:    env,
-		Logger: utils.LogStd(c2),
 		Stderr: c1,
+		Logger: utils.LogStd(c2),
 	})
 
 	mux.Get("/", web.Redirect(CGI_PATH, true))
@@ -227,31 +212,14 @@ func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err err
 	}
 }
 
-func logPan(module, prefix string) func(string) {
-	var l slog.Level
-	p := log.PrefixAttr(module)
-	// 2026-01-17T12:51:53.176432382+08:00
-	// 2026-01-16T22:08:13.883171573+08:00 INFO|WARNING|ERROR
+func logPan(ctx context.Context, prefix string) func(string) {
+	l := slog.LevelDebug
 	r := regexp.MustCompile(`([0-9T:.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
-	if prefix != "" {
-		prefix = fmt.Sprintf("[%s] ", prefix)
-	}
-
-	timeParse := func(s string) (time.Time, bool) {
-		if t, e := time.Parse("2006-01-02T15:04:05.999999999-0700", s); e == nil {
-			return t, true
-		}
-		t, e := time.Parse(time.RFC3339Nano, s)
-		if e == nil {
-			return t, true
-		}
-		return time.Time{}, false
-	}
 
 	return func(s string) {
 		var t slog.Attr
 		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
-			l = log.LevelFromString(matches[2], slog.LevelDebug)
+			l = cmp.Or(log.LevelFromString(matches[2], l), slog.LevelDebug)
 			if d, ok := timeParse(matches[1]); ok {
 				t = slog.Time(slog.TimeKey, d)
 			} else {
@@ -259,6 +227,38 @@ func logPan(module, prefix string) func(string) {
 			}
 			s = s[len(matches[0]):]
 		}
-		slog.LogAttrs(context.Background(), l, prefix+s, p, t)
+		slog.LogAttrs(ctx, l, prefix+s, t)
 	}
+}
+
+func logErrCgi(ctx context.Context) func(s string) {
+	r := regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+`)
+	return func(s string) {
+		var t slog.Attr
+		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
+			if d, ok := timeParse(matches[1]); ok {
+				t = slog.Time(slog.TimeKey, d)
+			} else {
+				t = slog.String("pan_time", matches[1])
+			}
+			s = s[len(matches[0]):]
+		}
+		slog.LogAttrs(ctx, slog.LevelDebug, "[cgi] [err] "+s, t)
+	}
+}
+
+func timeParse(s string) (t time.Time, ok bool) {
+	layouts := []string{"15:04:05.00", "2006-01-02T15:04:05.999999999-0700", "2026/01/16 22:08:13"}
+	for i, l := range layouts {
+		if len(l) == len(s) {
+			if dt, err := time.Parse(l, s); err == nil {
+				if i == 0 {
+					now := time.Now()
+					dt = dt.AddDate(now.Year(), int(now.Month())-1, now.Day())
+				}
+				return dt, true
+			}
+		}
+	}
+	return
 }
