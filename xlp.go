@@ -141,13 +141,25 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	mux := web.NewMux()
 	mux.Recoverer()
 
-	c1 := cmdx.LineWriter(logPan("pan", "cgi1"))
+	c1 := cmdx.LineWriter(logPan("pan", "cgi"))
 	defer c1.Close()
 
-	c2 := cmdx.LineWriter(logPan("pan", "cgi2"))
+	c2 := cmdx.LineWriter(func() func(s string) {
+		r := regexp.MustCompile(`^(\d{4})/(\d{2})/(\d{2}) (\d{2}):(\d{2}):\d{2})\s+`)
+		return func(s string) {
+			var t slog.Attr
+			if matches := r.FindStringSubmatch(s); len(matches) > 0 {
+				if d, e := time.Parse("2026/01/16 22:08:13", s); e == nil {
+					t = slog.Time(slog.TimeKey, d)
+				} else {
+					t = slog.String("pan_time", matches[1])
+				}
+				s = s[len(matches[0]):]
+			}
+			slog.LogAttrs(ctx, slog.LevelDebug, "[cgi] [err] "+s, log.PrefixAttr("pan"), t)
+		}
+	}())
 	defer c2.Close()
-
-	//2026/01/18 04:26:58
 
 	mux.Handle("/webman/status",
 		web.FBlob(
@@ -162,8 +174,8 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 		Dir:    DIR_SYNOPKG_WORK,
 		Path:   FILE_INDEX_CGI,
 		Env:    env,
-		Logger: utils.LogStd(c1),
-		Stderr: c2,
+		Logger: utils.LogStd(c2),
+		Stderr: c1,
 	})
 
 	mux.Get("/", web.Redirect(CGI_PATH, true))
