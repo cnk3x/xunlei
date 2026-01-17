@@ -9,17 +9,20 @@ import (
 )
 
 type Cmd struct {
-	exec.Cmd
+	*cmd
 	preStart  func(*Cmd) error
 	onStarted func(*Cmd) error
 	onExit    func(*Cmd) error
 }
 
+type cmd = exec.Cmd
+
 func Exec(ctx context.Context, name string, options ...Option) (err error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 
-	c := &Cmd{Cmd: *(exec.CommandContext(ctx, name))}
+	c := &Cmd{cmd: exec.CommandContext(ctx, name)}
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
 
 	undo, err := apply(Options(options...), c)
