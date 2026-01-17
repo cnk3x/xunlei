@@ -68,14 +68,14 @@ func ConfigBind(cfg *Config) (err error) {
 	}
 
 	if cfg.DirDownload = utils.CompactUniq(cfg.DirDownload); len(cfg.DirDownload) == 0 {
-		cfg.DirDownload = []string{"/xunlei/downloads"}
+		cfg.DirDownload = []string{"./xunlei/downloads"}
 	}
 
-	if cfg.DirData, err = filepath.Abs(cmp.Or(cfg.DirData, "/xunlei/data")); err != nil {
+	if cfg.DirData, err = filepath.Abs(cmp.Or(cfg.DirData, "./xunlei/data")); err != nil {
 		return
 	}
 
-	if cfg.Chroot, err = filepath.Abs(cmp.Or(cfg.Chroot, "/")); err != nil {
+	if cfg.Chroot, err = filepath.Abs(cmp.Or(cfg.Chroot, "./xunlei")); err != nil {
 		return
 	}
 

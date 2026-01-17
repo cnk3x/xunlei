@@ -9,9 +9,9 @@ import (
 )
 
 // type Undo func()
-type Option func(ro *Options)
+type Option func(ro *options)
 
-type Options struct {
+type options struct {
 	root string
 
 	uid, gid int
@@ -20,7 +20,7 @@ type Options struct {
 	binds  []sys.BindOptions
 	links  []sys.LinkOptions
 
-	before func(ctx context.Context) error
+	before func(ctx context.Context) (undo func(), err error)
 	after  func(ctx context.Context, err error) error
 	run    func(ctx context.Context) error
 
@@ -31,12 +31,12 @@ type Options struct {
 //
 //   - chroot + seteuid 实现权限最小化（临时降权）
 //   - 执行顺序 root 启动 → 准备 chroot 监狱 → chroot 切换 → setegid/seteuid 降权 → 执行核心任务 → 恢复 root 权限
-func Exec(ctx context.Context, options ...Option) (err error) {
+func Exec(ctx context.Context, execOpts ...Option) (err error) {
 	slog.InfoContext(ctx, "start boot")
 	defer slog.InfoContext(ctx, "stopped")
 
-	var opts Options
-	for _, option := range options {
+	var opts options
+	for _, option := range execOpts {
 		option(&opts)
 	}
 
@@ -51,9 +51,11 @@ func Exec(ctx context.Context, options ...Option) (err error) {
 	defer undo()
 
 	if opts.before != nil {
-		if err = opts.before(ctx); err != nil {
+		var beforeUndo sys.Undo
+		if beforeUndo, err = opts.before(ctx); err != nil {
 			return
 		}
+		defer beforeUndo()
 	}
 
 	run := func(ctx context.Context) error {

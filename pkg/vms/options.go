@@ -8,27 +8,27 @@ import (
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
-func Root(root string) Option { return func(ro *Options) { ro.root = root } }
+func Root(root string) Option { return func(ro *options) { ro.root = root } }
 
-func Run(run func(ctx context.Context) error) Option { return func(ro *Options) { ro.run = run } }
+func Run(run func(ctx context.Context) error) Option { return func(ro *options) { ro.run = run } }
 
 func User[U, G utils.IntT | utils.UintT](uid U, gid G) Option {
-	return func(ro *Options) { ro.uid, ro.gid = int(uid), int(gid) }
+	return func(ro *options) { ro.uid, ro.gid = int(uid), int(gid) }
 }
 
 func Debug(debug ...bool) Option {
-	return func(ro *Options) { ro.debug = len(debug) == 0 || debug[0] }
+	return func(ro *options) { ro.debug = len(debug) == 0 || debug[0] }
 }
 
 func After(after func(ctx context.Context, runErr error) (err error)) Option {
-	return func(ro *Options) { ro.after = after }
+	return func(ro *options) { ro.after = after }
 }
 
-func Before(before func(ctx context.Context) (err error)) Option {
-	return func(ro *Options) { ro.before = before }
+func Before(before func(ctx context.Context) (undo func(), err error)) Option {
+	return func(ro *options) { ro.before = before }
 }
 
-func Basic(ro *Options) {
+func Basic(ro *options) {
 	ro.mounts = append(ro.mounts,
 		// 挂载proc文件系统（必须）
 		sys.MountOptions{Target: filepath.Join(ro.root, "proc"), Source: "proc", Fstype: "proc"},
@@ -42,7 +42,7 @@ func Basic(ro *Options) {
 }
 
 func Links(files ...string) Option {
-	return func(ro *Options) {
+	return func(ro *options) {
 		for _, file := range files {
 			mOpts := sys.LinkOptions{
 				Source:   file,
@@ -54,8 +54,8 @@ func Links(files ...string) Option {
 	}
 }
 
-func Binds(dirs ...string) func(ro *Options) {
-	return func(ro *Options) {
+func Binds(dirs ...string) func(ro *options) {
+	return func(ro *options) {
 		for _, dir := range dirs {
 			mOpts := sys.BindOptions{
 				Source:   dir,

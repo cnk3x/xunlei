@@ -54,13 +54,19 @@ var (
 	SYNO_VERSION  = SYNO_PLATFORM + " dsm " + SYNOPKG_DSM_VERSION_MAJOR + "." + SYNOPKG_DSM_VERSION_MINOR + "-" + SYNOPKG_DSM_VERSION_BUILD //系统版本
 )
 
-func Before(cfg Config) func(ctx context.Context) error {
-	return func(ctx context.Context) (err error) {
-		return utils.SeqExec(
-			func() error { return mockSyno(cfg.Chroot) },
-			func() error { return os.MkdirAll(DIR_SYNOPKG_PKGDEST, 0777) },
-			func() error { return os.Chmod(DIR_SYNOPKG_PKGDEST, 0777) },
-			func() error { return os.RemoveAll(filepath.Join(cfg.Chroot, DIR_VAR)) },
+func Before(cfg Config) func(ctx context.Context) (func(), error) {
+	return func(ctx context.Context) (func(), error) {
+		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
+		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
+
+		if err := os.RemoveAll(varPath); err != nil {
+			return nil, err
+		}
+
+		return utils.SeqExecWithUndo(
+			mockSyno(ctx, cfg.Chroot),
+			func() (undo func(), err error) { return sys.Mkdir(ctx, target, 0777) },
+			func() (undo func(), err error) { return sys.Mkdir(ctx, varPath, 0777) },
 		)
 	}
 }
@@ -167,21 +173,26 @@ func mockEnv(dirData, dirDownload string) []string {
 	)
 }
 
-func mockSyno(root string) error {
-	err := fo.OpenWrite(
-		filepath.Join(root, FILE_SYNO_INFO_CONF),
-		fo.Lines(
-			fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
-			fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
-			fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
-		),
-		fo.FlagExcl(true),
-	)
-	if err != nil {
-		return err
+func mockSyno(ctx context.Context, root string) func() (undo func(), err error) {
+	return func() (undo func(), err error) {
+		return utils.SeqExecWithUndo(
+			mockSynoInfo(ctx, root),
+			authenticate_cgi.SaveFunc(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI)),
+		)
 	}
+}
 
-	return authenticate_cgi.SaveTo(filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI))
+func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err error) {
+	return func() (undo func(), err error) {
+		return fo.WriteFile(ctx,
+			filepath.Join(root, FILE_SYNO_INFO_CONF),
+			fo.Lines(
+				fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
+				fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
+				fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
+			),
+		)
+	}
 }
 
 func logPan(module, prefix string) func(string) {
