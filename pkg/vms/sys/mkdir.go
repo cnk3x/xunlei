@@ -28,9 +28,8 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 		return
 	}
 
-	var undos []Undo
-	undo = Undos(&undos)
-	defer ExecUndo(undo, &err)
+	u := utils.MakeUndoPool(&undo, &err)
+	defer u.ErrDefer()
 
 	vol := cmp.Or(filepath.VolumeName(dir), "/")
 	items := strings.FieldsFunc(strings.TrimPrefix(dir, vol), func(r rune) bool { return r == '/' })
@@ -38,16 +37,13 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 	var ok bool
 	for i := range items {
 		p := filepath.Join(vol, filepath.Join(items[:i+1]...))
-
-		ok, err = mkdir(p, perm)
-
-		if err != nil {
+		if ok, err = mkdir(p, perm); err != nil {
 			slog.WarnContext(ctx, "mkdir fail", "dir", p, "err", err)
 			break
 		}
 
 		if ok {
-			undos = append(undos, newRm(ctx, p, utils.Iif(i == len(items)-1, "rmdir", "")))
+			u.Put(newRm(ctx, p, utils.Iif(i == len(items)-1, "rmdir", "")))
 		}
 	}
 

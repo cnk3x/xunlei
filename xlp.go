@@ -73,7 +73,8 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		slog.DebugContext(ctx, "app start")
+		slog.InfoContext(ctx, "app start")
+		defer slog.InfoContext(ctx, "app done")
 
 		ctx, cancel := context.WithCancelCause(ctx)
 		defer cancel(fmt.Errorf("done"))

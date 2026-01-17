@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/fo"
+	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
 type LinkOptions struct {
@@ -35,9 +36,8 @@ func LinkRs(ctx context.Context, root string, items []LinkOptions) (undo Undo, e
 
 // link hard link, only for file
 func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
-	var undos []Undo
-	undo = Undos(&undos)
-	defer ExecUndo(undo, &err)
+	u := utils.MakeUndoPool(&undo, &err)
+	defer u.ErrDefer()
 
 	var real string
 	err = func() (err error) {
@@ -49,7 +49,7 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		if err = e; err != nil {
 			return
 		}
-		undos = append(undos, du)
+		u.Put(du)
 
 		if err = os.Link(real, m.Target); !errors.Is(err, syscall.EXDEV) {
 			return
@@ -81,7 +81,6 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		slog.LogAttrs(ctx, slog.LevelWarn, "link fail", attrs...)
 	default:
 		slog.LogAttrs(ctx, slog.LevelDebug, "link done", attrs...)
-		undos = append(undos, newRm(ctx, m.Target, "unlink"))
 	}
 
 	return

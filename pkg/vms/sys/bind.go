@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"path/filepath"
 	"syscall"
+
+	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
 type BindOptions struct {
@@ -30,16 +32,15 @@ func BindRs(ctx context.Context, root string, items []BindOptions) (undo Undo, e
 func Bind(ctx context.Context, m BindOptions) (undo Undo, err error) {
 	src := m.Source
 
-	var undos []Undo
-	undo = Undos(&undos)
-	defer ExecUndo(undo, &err)
+	u := utils.MakeUndoPool(&undo, &err)
+	defer u.ErrDefer()
 
 	if src, err = filepath.EvalSymlinks(src); err == nil {
 		var dirUndo Undo
 		if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
-			undos = append(undos, dirUndo)
+			u.Put(dirUndo)
 			if err = syscall.Mount(src, m.Target, "", syscall.MS_BIND, ""); err == nil {
-				undos = append(undos, mkUnmount(ctx, m.Target, "unbind"))
+				u.Put(mkUnmount(ctx, m.Target, "unbind"))
 			}
 		}
 	}

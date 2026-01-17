@@ -31,15 +31,14 @@ func Mount(ctx context.Context, m MountOptions) (undo Undo, err error) {
 		}
 	}()
 
-	var undos []Undo
-	undo = Undos(&undos)
-	defer ExecUndo(undo, &err)
+	u := utils.MakeUndoPool(&undo, &err)
+	defer u.ErrDefer()
 
 	var dirUndo Undo
 	if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
-		undos = append(undos, dirUndo)
+		u.Put(dirUndo)
 		if err = syscall.Mount(m.Source, m.Target, m.Fstype, m.Flags, m.Data); err == nil {
-			undos = append(undos, mkUnmount(ctx, m.Target, "unmount"))
+			u.Put(mkUnmount(ctx, m.Target, "unmount"))
 		}
 	}
 
