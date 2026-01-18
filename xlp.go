@@ -212,13 +212,13 @@ func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err err
 	}
 }
 
+var prefixRe = regexp.MustCompile(`([0-9 TZ:/.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
+
 func logPan(ctx context.Context, prefix string) func(string) {
 	l := slog.LevelDebug
-	r := regexp.MustCompile(`([0-9T:.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
-
 	return func(s string) {
 		var t slog.Attr
-		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
+		if matches := prefixRe.FindStringSubmatch(s); len(matches) > 0 {
 			l = cmp.Or(log.LevelFromString(matches[2], l), slog.LevelDebug)
 			if d, ok := timeParse(matches[1]); ok {
 				t = slog.Time(slog.TimeKey, d)
@@ -232,10 +232,9 @@ func logPan(ctx context.Context, prefix string) func(string) {
 }
 
 func logErrCgi(ctx context.Context) func(s string) {
-	r := regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+`)
 	return func(s string) {
 		var t slog.Attr
-		if matches := r.FindStringSubmatch(s); len(matches) > 0 {
+		if matches := prefixRe.FindStringSubmatch(s); len(matches) > 0 {
 			if d, ok := timeParse(matches[1]); ok {
 				t = slog.Time(slog.TimeKey, d)
 			} else {
@@ -248,15 +247,33 @@ func logErrCgi(ctx context.Context) func(s string) {
 }
 
 func timeParse(s string) (t time.Time, ok bool) {
-	layouts := []string{"15:04:05.00", "2006-01-02T15:04:05.999999999-0700", "2026/01/16 22:08:13"}
-	for i, l := range layouts {
-		if len(l) == len(s) {
-			if dt, err := time.Parse(l, s); err == nil {
-				if i == 0 {
+	layouts := []struct {
+		layout   string
+		inLocal  bool
+		addToday bool
+	}{
+		{"15:04:05.00", true, true},
+		{"15:04:05.0", true, true},
+		{"2026/01/16 22:08:13", true, false},
+		{"2006-01-02T15:04:05.999999999-0700", false, false},
+		{"2006-01-02T15:04:05.999999999-07:00", false, false},
+	}
+
+	var err error
+	for _, l := range layouts {
+		if len(l.layout) == len(s) {
+			if l.inLocal {
+				t, err = time.ParseInLocation(l.layout, s, time.Local)
+			} else {
+				t, err = time.Parse(l.layout, s)
+			}
+			if err == nil {
+				if l.addToday {
 					now := time.Now()
-					dt = dt.AddDate(now.Year(), int(now.Month())-1, now.Day())
+					t = t.AddDate(now.Year(), int(now.Month())-1, now.Day())
 				}
-				return dt, true
+				ok = true
+				return
 			}
 		}
 	}

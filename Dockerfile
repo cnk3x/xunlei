@@ -17,8 +17,10 @@ RUN chmod +x /rootfs/xlp
 FROM --platform=${TARGETARCH} busybox:1.37
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.authors=cnk3x
-LABEL org.opencontainers.image.source=https://github.com/cnk3x/xunlei
+LABEL org.opencontainers.image.authors=cnk3x \
+  org.opencontainers.image.source=https://github.com/cnk3x/xunlei \
+  org.opencontainers.image.description="迅雷远程下载服务(非官方)" \
+  org.opencontainers.image.licenses=MIT
 
 COPY --from=0 /rootfs /
 

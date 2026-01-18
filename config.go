@@ -35,9 +35,9 @@ type Config struct {
 // 默认配置端口2345，下载保存文件夹 /xunlei/downloads, 数据文件夹 /xunlei/data
 func ConfigBind(cfg *Config) (err error) {
 	cfg.Port = 2345
-	cfg.Chroot = "./xunlei"
-	cfg.DirData = "./xunlei/data"
-	cfg.DirDownload = []string{"./xunlei/downloads"}
+	cfg.Chroot = utils.Eon(filepath.Abs("./xunlei"))
+	cfg.DirData = utils.Eon(filepath.Abs("./xunlei/data"))
+	cfg.DirDownload = []string{utils.Eon(filepath.Abs("./xunlei/downloads"))}
 	cfg.SpkUrl = spk.DownloadUrl
 
 	flags.Var(&cfg.Port, "dashboard_port", "", "网页访问的端口", "XL_DASHBOARD_PORT", "XL_PORT")
@@ -53,32 +53,48 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
 	flags.Var(&cfg.Chroot, "chroot", "r", "CHROOT主目录", "XL_CHROOT")
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
-	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载")
-	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志")
+	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
+	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志", "XL_LAUNCHER_LOG_FILE")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 
-	if err = flags.Parse(); err != nil {
+	if err = utils.SeqExec(
+		flags.Parse,
+		checkPath(&cfg.Chroot, "./xunlei"),
+		checkPath(&cfg.DirData, "./xunlei/data"),
+		checkPaths(&cfg.DirDownload, "./xunlei/downloads"),
+	); err != nil {
 		return
 	}
-
-	for i, dir := range cfg.DirDownload {
-		if cfg.DirDownload[i], err = filepath.Abs(dir); err != nil {
-			return
-		}
-	}
-
-	if cfg.DirDownload = utils.CompactUniq(cfg.DirDownload); len(cfg.DirDownload) == 0 {
-		cfg.DirDownload = []string{"./xunlei/downloads"}
-	}
-
-	if cfg.DirData, err = filepath.Abs(cmp.Or(cfg.DirData, "./xunlei/data")); err != nil {
-		return
-	}
-
-	if cfg.Chroot, err = filepath.Abs(cmp.Or(cfg.Chroot, "./xunlei")); err != nil {
-		return
-	}
-
 	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)
 	return
+}
+
+// 检查路径，并把传入的路径转换成绝对路径
+func checkPaths(dirs *[]string, defPath string) func() (err error) {
+	return func() (err error) {
+		*dirs = utils.CompactUniq(*dirs)
+		if len(*dirs) == 0 {
+			*dirs = utils.Array(defPath)
+		}
+		for i, dir := range *dirs {
+			if (*dirs)[i], err = filepath.Abs(dir); err != nil {
+				*dirs = (*dirs)[:0]
+				return
+			}
+		}
+		*dirs = utils.CompactUniq(*dirs)
+		return
+	}
+}
+
+// 检查路径，并把传入的路径转换成绝对路径
+func checkPath(path *string, defPath string) func() (err error) {
+	return func() (err error) {
+		p, e := filepath.Abs(cmp.Or(*path, defPath))
+		if err = e; err != nil {
+			return
+		}
+		*path = p
+		return
+	}
 }
