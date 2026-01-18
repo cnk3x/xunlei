@@ -70,6 +70,10 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 		varPath := filepath.Join(cfg.Root, DIR_VAR)
 		dirHome := filepath.Join(cfg.DirData, ".drive")
 
+		if e := os.RemoveAll(varPath); e != nil {
+			slog.WarnContext(ctx, "clean dir fail", "path", varPath, "err", e)
+		}
+
 		undo, err = sys.Mkdirs(ctx, append(cfg.DirDownload, target, varPath, dirHome), 0777)
 		if err != nil {
 			return
@@ -109,6 +113,18 @@ func Run(cfg Config) func(ctx context.Context) error {
 		}
 
 		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
+
+		webStart := func(c *cmdx.Cmd) error {
+			utils.BackExec(func() {
+				if err := webRun(ctx, envs, cfg); err != nil {
+					cancel(err)
+				} else {
+					cancel(fmt.Errorf("web done"))
+				}
+			})
+			return nil
+		}
+
 		return cmdx.Exec(
 			log.Prefix(ctx, "vms"),
 			FILE_PAN_XUNLEI_CLI,
@@ -122,16 +138,8 @@ func Run(cfg Config) func(ctx context.Context) error {
 			cmdx.Env(envs),
 			cmdx.LineErr(logPan(ctx, "[stderr] ")),
 			cmdx.LineOut(logPan(ctx, "[stdout] ")),
-			cmdx.OnStarted(func(c *cmdx.Cmd) error {
-				utils.BackExec(func() {
-					if err := webRun(ctx, envs, cfg); err != nil {
-						cancel(err)
-					} else {
-						cancel(fmt.Errorf("web done"))
-					}
-				})
-				return nil
-			}),
+			cmdx.OnStarted(webStart),
+			cmdx.OnExit(func(c *cmdx.Cmd) error { return cleanExit(DIR_VAR) }),
 		)
 	}
 }
@@ -277,5 +285,28 @@ func timeParse(s string) (t time.Time, ok bool) {
 			}
 		}
 	}
+	return
+}
+
+func cleanExit(dir string) (err error) {
+	err = fo.OpenRead(dir, func(f *os.File) (err error) {
+		var entries []os.DirEntry
+		if entries, err = f.ReadDir(-1); err != nil {
+			return
+		}
+		for _, entry := range entries {
+			if name := entry.Name(); strings.HasSuffix(name, ".sock") || strings.HasSuffix(name, ".pid") {
+				if err = os.Remove(filepath.Join(dir, name)); err != nil {
+					return
+				}
+			}
+		}
+		return
+	})
+
+	if os.IsNotExist(err) {
+		err = nil
+	}
+
 	return
 }
