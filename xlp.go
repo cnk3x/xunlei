@@ -60,14 +60,14 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 		u := utils.MakeUndoPool(&undo, &err)
 		defer u.ErrDefer()
 
-		undo, err = mockSyno(ctx, cfg.Chroot)
+		undo, err = mockSyno(ctx, cfg.Root)
 		if err != nil {
 			return
 		}
 		u.Put(undo)
 
-		target := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
-		varPath := filepath.Join(cfg.Chroot, DIR_VAR)
+		target := filepath.Join(cfg.Root, DIR_SYNOPKG_PKGDEST)
+		varPath := filepath.Join(cfg.Root, DIR_VAR)
 		dirHome := filepath.Join(cfg.DirData, ".drive")
 
 		undo, err = sys.Mkdirs(ctx, append(cfg.DirDownload, target, varPath, dirHome), 0777)
@@ -76,7 +76,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 		}
 		u.Put(undo)
 
-		dest := filepath.Join(cfg.Chroot, DIR_SYNOPKG_PKGDEST)
+		dest := filepath.Join(cfg.Root, DIR_SYNOPKG_PKGDEST)
 		if err = spk.Download(ctx, cfg.SpkUrl, dest, cfg.ForceDownload); err != nil {
 			return
 		}
@@ -99,12 +99,12 @@ func Run(cfg Config) func(ctx context.Context) error {
 		defer cancel(fmt.Errorf("done"))
 
 		var dirDownload []string
-		if dirDownload, err = utils.NewRootPath(cfg.Chroot, cfg.DirDownload...); err != nil {
+		if dirDownload, err = utils.NewRootPath(cfg.Root, cfg.DirDownload...); err != nil {
 			return
 		}
 
 		var dirData []string
-		if dirData, err = utils.NewRootPath(cfg.Chroot, cfg.DirData); err != nil {
+		if dirData, err = utils.NewRootPath(cfg.Root, cfg.DirData); err != nil {
 			return
 		}
 

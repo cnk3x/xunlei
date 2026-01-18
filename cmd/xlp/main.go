@@ -41,7 +41,7 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("uid: %d", cfg.Uid))
 	slog.InfoContext(ctx, fmt.Sprintf("gid: %d", cfg.Gid))
 	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
-	slog.InfoContext(ctx, fmt.Sprintf("chroot: %s", cfg.Chroot))
+	slog.InfoContext(ctx, fmt.Sprintf("chroot: %s", cfg.Root))
 	slog.InfoContext(ctx, fmt.Sprintf("spk_url: %s", cfg.SpkUrl))
 	slog.InfoContext(ctx, fmt.Sprintf("force_download: %t", cfg.ForceDownload))
 
@@ -52,7 +52,7 @@ func main() {
 		vms.Run(xunlei.Run(cfg)),
 		vms.Debug(cfg.Debug),
 		vms.User(cfg.Uid, cfg.Gid),
-		vms.Root(cfg.Chroot),
+		vms.Root(cfg.Root),
 		vms.Binds("/lib", "/bin", "/etc/ssl"),
 		vms.Links("/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
 		vms.Links("/etc/passwd", "/etc/group", "/etc/shadow"),

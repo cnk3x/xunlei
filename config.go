@@ -25,17 +25,17 @@ type Config struct {
 	Uid           uint32   //运行迅雷的用户ID
 	Gid           uint32   //运行迅雷的用户组ID
 	PreventUpdate bool     //阻止更新
-	Chroot        string   //CHROOT主目录, 指定该值则以chroot模式运行, 这用于在容器内隔离环境
-	SpkUrl        string   //
+	Root          string   //主目录
+	SpkUrl        string   //下载链接
 	ForceDownload bool     //是否强制下载
 
-	LauncherLogFile string
+	LauncherLogFile string //迅雷启动器日志文件
 }
 
 // 默认配置端口2345，下载保存文件夹 /xunlei/downloads, 数据文件夹 /xunlei/data
 func ConfigBind(cfg *Config) (err error) {
 	cfg.Port = 2345
-	cfg.Chroot = utils.Eon(filepath.Abs("./xunlei"))
+	cfg.Root = utils.Eon(filepath.Abs("./xunlei"))
 	cfg.DirData = utils.Eon(filepath.Abs("./xunlei/data"))
 	cfg.DirDownload = []string{utils.Eon(filepath.Abs("./xunlei/downloads"))}
 	cfg.SpkUrl = spk.DownloadUrl
@@ -51,15 +51,15 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.Uid, "uid", "u", "运行迅雷的用户ID", "XL_UID", "UID")
 	flags.Var(&cfg.Gid, "gid", "g", "运行迅雷的用户组ID", "XL_GID", "GID")
 	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
-	flags.Var(&cfg.Chroot, "chroot", "r", "CHROOT主目录", "XL_CHROOT")
+	flags.Var(&cfg.Root, "chroot", "r", "主目录", "XL_CHROOT")
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
 	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
-	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志", "XL_LAUNCHER_LOG_FILE")
+	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志文件", "XL_LAUNCHER_LOG_FILE")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 
 	if err = utils.SeqExec(
 		flags.Parse,
-		checkPath(&cfg.Chroot, "./xunlei"),
+		checkPath(&cfg.Root, "./xunlei"),
 		checkPath(&cfg.DirData, "./xunlei/data"),
 		checkPaths(&cfg.DirDownload, "./xunlei/downloads"),
 	); err != nil {

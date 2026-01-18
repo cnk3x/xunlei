@@ -1,4 +1,4 @@
-FROM debian:stable-slim
+FROM --platform=${TARGETARCH} debian:stable-slim
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.authors=cnk3x
