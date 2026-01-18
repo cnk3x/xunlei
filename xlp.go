@@ -156,10 +156,10 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 		),
 	)
 
-	c1 := cmdx.LineWriter(logPan(ctx, "[cgi] "))
+	c1 := cmdx.LineWriter(logPan(log.Prefix(ctx, "cgi"), "[std] "))
 	defer c1.Close()
 
-	c2 := cmdx.LineWriter(logErrCgi(ctx))
+	c2 := cmdx.LineWriter(logPan(log.Prefix(ctx, "cgi"), "[log] "))
 	defer c2.Close()
 
 	const CGI_PATH = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/index.cgi/"
@@ -229,29 +229,15 @@ func logPan(ctx context.Context, prefix string) func(string) {
 		var t slog.Attr
 		if matches := prefixRe.FindStringSubmatch(s); len(matches) > 0 {
 			l = cmp.Or(log.LevelFromString(matches[2], l), slog.LevelDebug)
-			if d, ok := timeParse(matches[1]); ok {
+			ts := strings.TrimSpace(matches[1])
+			if d, ok := timeParse(ts); ok {
 				t = slog.Time(slog.TimeKey, d)
 			} else {
-				t = slog.String("pan_time", matches[1])
+				t = slog.String("pan_time", ts)
 			}
 			s = s[len(matches[0]):]
 		}
 		slog.LogAttrs(ctx, l, prefix+s, t)
-	}
-}
-
-func logErrCgi(ctx context.Context) func(s string) {
-	return func(s string) {
-		var t slog.Attr
-		if matches := prefixRe.FindStringSubmatch(s); len(matches) > 0 {
-			if d, ok := timeParse(matches[1]); ok {
-				t = slog.Time(slog.TimeKey, d)
-			} else {
-				t = slog.String("pan_time", matches[1])
-			}
-			s = s[len(matches[0]):]
-		}
-		slog.LogAttrs(ctx, slog.LevelDebug, "[cgi] [err] "+s, t)
 	}
 }
 
