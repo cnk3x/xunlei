@@ -220,6 +220,7 @@ func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err err
 	}
 }
 
+// 2026-01-18T16:27:02.76464281+08:00
 var prefixRe = regexp.MustCompile(`(\d{2,4}[:/-]\d{2}[:/-]\d{2}[0-9 TZ:/.+-]+)\s*(INFO|ERROR|WARNING)?\s*>?\s*`)
 
 func logPan(ctx context.Context, prefix string) func(string) {
@@ -265,6 +266,16 @@ func timeParse(s string) (t time.Time, ok bool) {
 		{"2026/01/16 22:08:13", true, false},
 		{"2006-01-02T15:04:05.999999999-0700", false, false},
 		{"2006-01-02T15:04:05.999999999-07:00", false, false},
+		{"2006-01-02T15:04:05.99999999-07:00", false, false},
+		{"2006-01-02T15:04:05.9999999-07:00", false, false},
+		{"2006-01-02T15:04:05.999999-07:00", false, false},
+		{"2006-01-02T15:04:05.99999-07:00", false, false},
+		{"2006-01-02T15:04:05.9999-07:00", false, false},
+		{"2006-01-02T15:04:05.999-07:00", false, false},
+		{"2006-01-02T15:04:05.99-07:00", false, false},
+		{"2006-01-02T15:04:05.9-07:00", false, false},
+		{"2006-01-02T15:04:05-07:00", false, false},
+		{time.RFC3339Nano, false, false},
 	}
 
 	var err error
