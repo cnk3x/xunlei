@@ -220,7 +220,7 @@ func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err err
 	}
 }
 
-var prefixRe = regexp.MustCompile(`(\d{2,4}[:/-]\d{2}[:/-]\d{2}[0-9 TZ:/.+-]+)\s+(INFO|ERROR|WARNING)?\s*>?\s*`)
+var prefixRe = regexp.MustCompile(`(\d{2,4}[:/-]\d{2}[:/-]\d{2}[0-9 TZ:/.+-]+)\s*(INFO|ERROR|WARNING)?\s*>?\s*`)
 
 func logPan(ctx context.Context, prefix string) func(string) {
 	l := slog.LevelDebug
