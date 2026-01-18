@@ -1,10 +1,7 @@
-name: build
+name: 发布临时版本
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 jobs:
   build:
@@ -30,21 +27,6 @@ jobs:
           fi
           echo "v_xlp=${v_xlp}" >> $GITHUB_OUTPUT
           echo "v_xlp: ${v_xlp}"
-
-      - name: 设置镜像标签
-        id: docker_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            cnk3x/xunlei
-            ghcr.io/cnk3x/xunlei
-          tags: |
-            type=semver,pattern={{version}},value=v${{ steps.version.outputs.v_xlp }}
-            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.v_xlp }}
-            type=semver,pattern={{major}},value=v${{ steps.version.outputs.v_xlp }}
-            type=raw,value=latest
-          flavor: |
-            latest=true
 
       - name: 配置环境
         uses: actions/setup-go@v6
@@ -73,42 +55,12 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ secrets.GH_TOKEN }}"
 
-      - name: 登录DCR
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DCR_USER }}
-          password: ${{ secrets.DCR_TOKEN }}
-
       - name: 构建推送
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.docker_meta.outputs.tags }}
+          tags: ghcr.io/cnk3x/xunlei:${{ steps.version.outputs.v_xlp }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: 整理产物
-        env:
-          v_xlp: "${{ steps.version.outputs.v_xlp }}"
-        run: |
-          cd ./artifacts
-          mv xlp-amd64 xlp
-          tar -zcvf xlp-${v_xlp}-linux-amd64.tar.gz xlp
-          mv xlp-arm64 xlp
-          tar -zcvf xlp-${v_xlp}-linux-arm64.tar.gz xlp
-          ls -lh *.tar.gz
-
-      - name: 发布上传
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}"
-        with:
-          draft: true
-          name: "v${{ steps.version.outputs.v_xlp }}"
-          tag_name: "v${{ steps.version.outputs.v_xlp }}"
-          body_path: CHANGELOG.md
-          files: |
-            artifacts/xlp-${{ steps.version.outputs.v_xlp }}-linux-amd64.tar.gz
-            artifacts/xlp-${{ steps.version.outputs.v_xlp }}-linux-arm64.tar.gz
