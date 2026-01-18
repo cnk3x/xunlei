@@ -9,16 +9,22 @@ DProxy := --build-arg http_proxy=$(http_proxy) --build-arg https_proxy=$(https_p
 DBuild := docker buildx build
 DPush := $(DBuild) --push --platform linux/amd64,linux/arm64
 
-VERSION := $(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
+VERSION := "$(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')beta"
 
 showTag::
 	@echo version is $(VERSION)
 
 amd64::
 	GOOS=linux GOARCH=amd64 $(GBuild) -v -o artifacts/xlp-amd64 ./cmd/xlp
+	cp artifacts/xlp-amd64 artifacts/xlp
+	tar -C artifacts -czvf artifacts/xlp-$(VERSION)-linux-amd64.tar.gz xlp
+	rm artifacts/xlp
 
 arm64::
 	GOOS=linux GOARCH=arm64 $(GBuild) -v -o artifacts/xlp-arm64 ./cmd/xlp
+	cp artifacts/xlp-arm64 artifacts/xlp
+	tar -C artifacts -czvf artifacts/xlp-$(VERSION)-linux-arm64.tar.gz xlp
+	rm artifacts/xlp
 
 build:: amd64 arm64
 

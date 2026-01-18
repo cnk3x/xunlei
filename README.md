@@ -101,7 +101,7 @@ XL_DEBUG=false
 services:
   xunlei:
     container_name: xunlei
-    image: cnk3x/xunlei:3.22.0-beta
+    image: cnk3x/xunlei:beta
     restart: unless-stopped
 
     # 宿主机名，迅雷远程控制的名称与此相关，会显示 `群晖-r66s`
