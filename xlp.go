@@ -220,7 +220,7 @@ func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err err
 	}
 }
 
-var prefixRe = regexp.MustCompile(`([0-9 TZ:/.+-]+)\s+(INFO|ERROR|WARNING)\s*>?\s*`)
+var prefixRe = regexp.MustCompile(`(\d{2,4}[:/-]\d{2}[:/-]\d{2}[0-9 TZ:/.+-]+)\s+(INFO|ERROR|WARNING)?\s*>?\s*`)
 
 func logPan(ctx context.Context, prefix string) func(string) {
 	l := slog.LevelDebug
@@ -268,6 +268,7 @@ func timeParse(s string) (t time.Time, ok bool) {
 	}
 
 	var err error
+	s = strings.TrimSpace(s)
 	for _, l := range layouts {
 		if len(l.layout) == len(s) {
 			if l.inLocal {
