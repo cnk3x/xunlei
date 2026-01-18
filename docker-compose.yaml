@@ -1,12 +1,11 @@
-# 该示例为作者本人在飞牛NAS的配置（截止3.22.0发布时，飞牛已经推出了迅雷官方版，可以不需要本程序了）
 services:
   xunlei:
     container_name: xunlei
     image: ghcr.io/cnk3x/xunlei:3.22.0
     restart: unless-stopped
 
-    # 宿主机名，迅雷远程控制的名称与此相关，会显示 `群晖-fn01`
-    hostname: fn01
+    # 宿主机名，迅雷远程控制的名称与此相关，会显示 `群晖-r66s`
+    hostname: r66s
 
     # 必须, cap_add: [SYS_ADMIN] 和 privileged: true 二选一
     cap_add: [SYS_ADMIN]
@@ -19,23 +18,28 @@ services:
     # network_mode: host
 
     environment:
-      # 如果需要指定多个下载目录，手动指定XL_DIR_DOWNLOAD
-      # 多个以冒号`:`隔开，都必须以 /xunlei 开头，迅雷面板选择保存路径显示会去掉/xunlei前缀
-      # 指定后可以在 volumes 中绑定宿主机实际目录
-      # 迅雷云盘的缓存会使用第一个目录会缓存
-      # /xunlei/后面可以用中文
-      # 不设置默认一个目录 /xunlei/downloads
-      - XL_DIR_DOWNLOAD=/xunlei/下载:/xunlei/影音:/xunlei/大人
+      ##如果需要指定多个下载目录，手动指定XL_DIR_DOWNLOAD
+      ##多个以冒号`:`隔开，都必须以 /xunlei 开头，迅雷面板选择保存路径显示会去掉/xunlei前缀
+      ##指定后可以在 volumes 中绑定宿主机实际目录
+      ##迅雷云盘的缓存会使用第一个目录会缓存
+      ##/xunlei/后面可以用中文
+      ##不设置默认一个目录 /xunlei/downloads
+      #- XL_DIR_DOWNLOAD=/xunlei/下载:/xunlei/影音:/xunlei/大人
 
       # 设置用户身份，请确保该用户对 XL_DIR_DOWNLOAD 指定的目录或者默认的 /xunlei/downloads 有读写权限
       - XL_UID=1000 # 用户ID
       - XL_GID=1000 # 用户组ID
     volumes:
-      # 必须，对应 XL_DIR_DOWNLOAD 指定的目录, 请替换冒号前面的路径为实际路径
-      - /vol1/1000/下载:/xunlei/下载
-      - /vol1/1000/影音/下载:/xunlei/影音
-      - /vol1/1000/大人/下载:/xunlei/大人
+      ## 二选一必须，对应 XL_DIR_DOWNLOAD 指定的目录, 请替换冒号前面的路径为实际路径
+      #- /vol1/1000/下载:/xunlei/下载
+      #- /vol1/1000/影音/下载:/xunlei/影音
+      #- /vol1/1000/大人/下载:/xunlei/大人
+
+      ## 二选一必须，如果没有通过 XL_DIR_DOWNLOAD 指定下载目录，请将下面这行代码替换为上面代码
+      - /vol1/1000/下载:/xunlei/downloads
+
       # 必须，数据目录，迅雷运行时，插件，升级，包括登录数据都在这
       - ./data:/xunlei/data
+
       # 可选，首次初始化，会从远程下载迅雷套件到此处，如果不配置每次重新创建都会重新从远程下载
       - ./cache:/xunlei/var/packages/pan-xunlei-com
