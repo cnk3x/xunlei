@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"syscall"
+
+	"github.com/cnk3x/xunlei/pkg/log"
 )
 
 type Cmd struct {
@@ -18,6 +21,7 @@ type Cmd struct {
 type cmd = exec.Cmd
 
 func Exec(ctx context.Context, name string, options ...Option) (err error) {
+	defer log.LogDone(ctx, slog.LevelDebug, filepath.Base(name), &err).Defer()
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Cmd{cmd: exec.CommandContext(ctx, name)}
@@ -36,8 +40,8 @@ func Exec(ctx context.Context, name string, options ...Option) (err error) {
 
 	if c.preStart != nil {
 		if err = c.preStart(c); err != nil {
-			slog.ErrorContext(ctx, "pre_start fail", "err", err)
-			err = fmt.Errorf("pre_start fail: %w", err)
+			slog.ErrorContext(ctx, "pre start fail", "err", err)
+			err = fmt.Errorf("pre start fail")
 			cancel(err)
 			return
 		}

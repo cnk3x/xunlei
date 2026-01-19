@@ -5,31 +5,29 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path/filepath"
+
+	"github.com/cnk3x/xunlei/pkg/fo"
 )
 
 func Chown(ctx context.Context, paths []string, uid, gid uint32, recursive bool) {
-	_chown := func(path string, uid, gid uint32) {
+	chown := func(path string, _ fs.DirEntry) error {
 		if err := os.Chown(path, int(uid), int(gid)); err != nil {
+			slog.DebugContext(ctx, "chown", "uid", uid, "gid", gid, "path", path, "err", err)
+		} else {
 			slog.DebugContext(ctx, "chown", "uid", uid, "gid", gid, "path", path)
 		}
+		return nil
 	}
 
-	chown := func(path string, uid, gid uint32, recursive bool) {
+	processItem := func(path string, recursive bool) {
 		if recursive {
-			filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
-				if err != nil {
-					return err
-				}
-				_chown(path, uid, gid)
-				return nil
-			})
+			fo.WalkDir(path, chown)
 		} else {
-			_chown(path, uid, gid)
+			chown(path, nil)
 		}
 	}
 
 	for _, path := range paths {
-		chown(path, uid, gid, recursive)
+		processItem(path, recursive)
 	}
 }

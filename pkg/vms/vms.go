@@ -33,7 +33,7 @@ type options struct {
 //   - chroot + seteuid 实现权限最小化（临时降权）
 //   - 执行顺序 root 启动 → 准备 chroot 监狱 → chroot 切换 → setegid/seteuid 降权 → 执行核心任务 → 恢复 root 权限
 func Exec(ctx context.Context, execOpts ...Option) (err error) {
-	defer log.LogDone(ctx, slog.LevelInfo, "vms", &err)
+	defer log.LogDone(ctx, slog.LevelInfo, "vms", &err).Defer()
 
 	var opts options
 	for _, option := range execOpts {
@@ -59,7 +59,7 @@ func Exec(ctx context.Context, execOpts ...Option) (err error) {
 	}
 
 	run := func(ctx context.Context) (err error) {
-		defer log.LogDone(ctx, slog.LevelInfo, "runner", &err)
+		defer log.LogDone(ctx, slog.LevelInfo, "runner", &err).Defer()
 		err = sys.RunAs(ctx, opts.uid, opts.gid, func() error {
 			if opts.run == nil {
 				return nil

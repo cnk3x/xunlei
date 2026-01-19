@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -47,27 +48,16 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 		}
 	}
 
-	// switch {
-	// case ok:
-	// 	slog.DebugContext(ctx, "mkdir done", "dir", dir)
-	// default:
-	// 	slog.DebugContext(ctx, "mkdir skip", "dir", dir, "cause", "directory exists")
-	// }
 	return
 }
 
 func newRm(ctx context.Context, target, act string) func() {
 	return func() {
-		err := os.Remove(target)
-		if act != "" {
-			switch {
-			case errors.Is(err, syscall.ENOTEMPTY): //目录非空
-				slog.LogAttrs(ctx, slog.LevelDebug, act+" skip", slog.String("target", target), slog.String("cause", "directory not empty"))
-			case err != nil:
-				slog.LogAttrs(ctx, slog.LevelWarn, act+" fail", slog.String("target", target), slog.String("err", err.Error()))
-			default:
-				slog.LogAttrs(ctx, slog.LevelDebug, act+" done", slog.String("target", target))
+		if err := os.Remove(target); act != "" {
+			if errors.Is(err, syscall.ENOTEMPTY) {
+				err = fmt.Errorf("%s: %w", "directory not empty", err)
 			}
+			logIt(ctx, err, true, act, slog.String("target", target))
 		}
 	}
 }

@@ -18,7 +18,7 @@ func Chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 		if wd, err = os.Getwd(); err != nil {
 			return
 		}
-		defer log.LogDone(ctx, slog.LevelDebug, "chroot ", &err, "root", newRoot, "wd", wd)
+		defer log.LogDone(ctx, slog.LevelDebug, "chroot ", &err, "root", newRoot, "wd", wd).Defer()
 
 		if err = syscall.Chdir(newRoot); err != nil {
 			return
@@ -48,7 +48,6 @@ func Chroot(ctx context.Context, newRoot string, run func(ctx context.Context) e
 			return
 		}
 
-		slog.DebugContext(ctx, "run start")
 		err = run(ctx)
 		return
 	}()

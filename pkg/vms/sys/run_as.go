@@ -23,28 +23,28 @@ func RunAs(ctx context.Context, uid, gid int, run func() error) error {
 
 	oUid := syscall.Getuid()
 	if oUid != 0 {
-		return errors.New("RunAs: 仅root进程（UID=0）支持 可逆切换身份")
+		return errors.New("runas: only the root process (UID=0) supports.")
 	}
 
 	defer func() {
 		if err := syscall.Seteuid(oEUid); err != nil {
-			slog.DebugContext(ctx, "RunAs: 恢复有效UID失败", "uid", oEUid, "err", err)
+			slog.DebugContext(ctx, "runas: restore uid fail", "uid", oEUid, "err", err)
 		}
 
 		if err := syscall.Setegid(oEGid); err != nil {
-			slog.DebugContext(ctx, "RunAs: 恢复有效GID失败", "gid", oEGid, "err", err)
+			slog.DebugContext(ctx, "runas: restore gid fail", "gid", oEGid, "err", err)
 		}
 	}()
 
 	if err := syscall.Setegid(gid); err != nil {
-		return fmt.Errorf("RunAs: 切换GID(%d)失败：%w", gid, err)
+		return fmt.Errorf("runas: change uid(%d) fail：%w", gid, err)
 	}
-	slog.InfoContext(ctx, "RunAs: 成功切换GID", "gid", gid)
+	slog.InfoContext(ctx, "runas: changed uid(%d)", "gid", gid)
 
 	if err := syscall.Seteuid(uid); err != nil {
-		return fmt.Errorf("RunAs: 切换UID(%d)失败：%w", uid, err)
+		return fmt.Errorf("runas: change gid(%d) fail：%w", uid, err)
 	}
-	slog.InfoContext(ctx, "RunAs: 成功切换UID", "uid", uid)
+	slog.InfoContext(ctx, "runas: changed gid(%d)", "uid", uid)
 
 	return run()
 }

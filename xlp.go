@@ -81,7 +81,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 		u.Put(undo)
 
 		dest := filepath.Join(cfg.Root, DIR_SYNOPKG_PKGDEST)
-		if err = spk.Download(ctx, cfg.SpkUrl, dest, cfg.ForceDownload); err != nil {
+		if err = spk.Download(ctx, cfg.SpkUrl, dest, cfg.SpkForceDownload); err != nil {
 			return
 		}
 
@@ -96,7 +96,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		defer log.LogDone(ctx, slog.LevelInfo, "xlp", &err)
+		defer log.LogDone(ctx, slog.LevelInfo, "xlp", &err).Defer()
 
 		ctx, cancel := context.WithCancelCause(ctx)
 		defer cancel(fmt.Errorf("done"))
@@ -150,7 +150,7 @@ func Run(cfg Config) func(ctx context.Context) error {
 
 func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	ctx = log.Prefix(ctx, "web")
-	defer log.LogDone(ctx, slog.LevelInfo, "web", &err)
+	defer log.LogDone(ctx, slog.LevelInfo, "web", &err).Defer()
 
 	mux := web.NewMux()
 	mux.Recoverer()

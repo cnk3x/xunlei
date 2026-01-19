@@ -70,17 +70,11 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		attrs = append(attrs, slog.String("err", err.Error()))
 	}
 
-	switch {
-	case os.IsExist(err):
-		err = nil
-		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
-	case err != nil && m.Optional:
+	if os.IsExist(err) {
 		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
 		err = nil
-	case err != nil && !m.Optional:
-		slog.LogAttrs(ctx, slog.LevelWarn, "link fail", attrs...)
-	default:
-		slog.LogAttrs(ctx, slog.LevelDebug, "link done", attrs...)
+	} else {
+		logIt(ctx, err, m.Optional, "link", attrs...)
 	}
 
 	return

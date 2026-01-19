@@ -20,14 +20,14 @@ type Config struct {
 	DashboardUsername string //网页访问的用户名
 	DashboardPassword string //网页访问的密码
 
-	DirDownload   []string //下载保存文件夹，可多次指定，需确保有权限访问
-	DirData       string   //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
-	Uid           uint32   //运行迅雷的用户ID
-	Gid           uint32   //运行迅雷的用户组ID
-	PreventUpdate bool     //阻止更新
-	Root          string   //主目录
-	SpkUrl        string   //下载链接
-	ForceDownload bool     //是否强制下载
+	DirDownload      []string //下载保存文件夹，可多次指定，需确保有权限访问
+	DirData          string   //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
+	Uid              uint32   //运行迅雷的用户ID
+	Gid              uint32   //运行迅雷的用户组ID
+	PreventUpdate    bool     //阻止更新
+	Root             string   //主目录
+	SpkUrl           string   //下载链接
+	SpkForceDownload bool     //是否强制下载
 
 	LauncherLogFile string //迅雷启动器日志文件
 }
@@ -53,7 +53,7 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
 	flags.Var(&cfg.Root, "chroot", "r", "主目录", "XL_CHROOT")
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
-	flags.Var(&cfg.ForceDownload, "force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
+	flags.Var(&cfg.SpkForceDownload, "spk_force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
 	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志文件", "XL_LAUNCHER_LOG_FILE")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 

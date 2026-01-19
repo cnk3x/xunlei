@@ -54,10 +54,10 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("dir data: %s", cfg.DirData))
 	slog.InfoContext(ctx, fmt.Sprintf("uid: %d", cfg.Uid))
 	slog.InfoContext(ctx, fmt.Sprintf("gid: %d", cfg.Gid))
-	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
-	slog.InfoContext(ctx, fmt.Sprintf("chroot: %s", cfg.Root))
+	slog.InfoContext(ctx, fmt.Sprintf("root: %s", cfg.Root))
 	slog.InfoContext(ctx, fmt.Sprintf("spk_url: %s", cfg.SpkUrl))
-	slog.InfoContext(ctx, fmt.Sprintf("force_download: %t", cfg.ForceDownload))
+	slog.InfoContext(ctx, fmt.Sprintf("spk_force_download: %t", cfg.SpkForceDownload))
+	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
 
 	err := vms.Exec(
 		log.Prefix(ctx, "vms"),
