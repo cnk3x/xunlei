@@ -16,8 +16,8 @@ func User[U, G utils.IntT | utils.UintT](uid U, gid G) Option {
 	return func(ro *options) { ro.uid, ro.gid = int(uid), int(gid) }
 }
 
-func Debug(debug ...bool) Option {
-	return func(ro *options) { ro.debug = len(debug) == 0 || debug[0] }
+func Wait(wait ...bool) Option {
+	return func(ro *options) { ro.wait = len(wait) == 0 || wait[0] }
 }
 
 func After(after func(ctx context.Context, runErr error) (err error)) Option {

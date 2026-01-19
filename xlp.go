@@ -3,6 +3,7 @@ package xunlei
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -207,23 +208,21 @@ func mockEnv(dirData, dirDownload string) []string {
 }
 
 func mockSyno(ctx context.Context, root string) (undo func(), err error) {
-	return utils.SeqExecWithUndo(
-		mockSynoInfo(ctx, root),
-		authenticate_cgi.SaveFunc(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI)),
+	u1, e1 := fo.WriteFile(ctx,
+		filepath.Join(root, FILE_SYNO_INFO_CONF),
+		fo.Lines(
+			fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
+			fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
+			fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
+		),
 	)
-}
 
-func mockSynoInfo(ctx context.Context, root string) func() (undo func(), err error) {
-	return func() (undo func(), err error) {
-		return fo.WriteFile(ctx,
-			filepath.Join(root, FILE_SYNO_INFO_CONF),
-			fo.Lines(
-				fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
-				fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
-				fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
-			),
-		)
+	u2, e2 := authenticate_cgi.Save(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI))
+
+	if err = errors.Join(e1, e2); err != nil {
+		utils.Call(u2, u1)
 	}
+	return
 }
 
 // 2026-01-18T16:27:02.76464281+08:00

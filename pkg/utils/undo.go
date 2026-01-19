@@ -9,13 +9,7 @@ func MakeUndoPool(undo *func(), autoUndoIfErr *error) (r struct {
 }) {
 	var undos []func()
 
-	r.Run = func() {
-		for _, undo := range slices.Backward(undos) {
-			if undo != nil {
-				undo()
-			}
-		}
-	}
+	r.Run = func() { BackwardCall(undos...) }
 
 	r.Put = func(undo func()) {
 		if undo != nil {
@@ -33,4 +27,20 @@ func MakeUndoPool(undo *func(), autoUndoIfErr *error) (r struct {
 		*undo = r.Run
 	}
 	return
+}
+
+func Call(fs ...func()) {
+	for _, f := range fs {
+		if f != nil {
+			f()
+		}
+	}
+}
+
+func BackwardCall(fs ...func()) {
+	for _, f := range slices.Backward(fs) {
+		if f != nil {
+			f()
+		}
+	}
 }

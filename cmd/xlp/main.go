@@ -34,6 +34,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if uid := os.Getuid(); uid != 0 {
+		slog.Error("exit", "err", "must run as root", "uid", uid)
+		os.Exit(1)
+	}
+
 	log.ForDefault(utils.Iif(cfg.Debug, "debug", "info"), false)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,12 +64,11 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("spk_force_download: %t", cfg.SpkForceDownload))
 	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
 
-	err := vms.Exec(
+	err := vms.Execute(
 		log.Prefix(ctx, "vms"),
-
 		vms.Before(xunlei.Before(cfg)),
 		vms.Run(xunlei.Run(cfg)),
-		vms.Debug(cfg.Debug),
+		vms.Wait(cfg.Debug),
 		vms.User(cfg.Uid, cfg.Gid),
 		vms.Root(cfg.Root),
 		vms.Binds("/lib", "/bin", "/etc/ssl"),
