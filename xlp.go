@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/cgi"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -86,10 +88,9 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 			return
 		}
 
-		if uid, gid := cfg.Uid, cfg.Gid; uid != 0 || gid != 0 {
-			gid = cmp.Or(gid, uid)
-			sys.Chown(ctx, utils.Array(varPath, dirHome), uid, gid, false)
-			sys.Chown(ctx, utils.Array(cfg.DirData, target), uid, gid, true)
+		if cfg.Uid != 0 || cfg.Gid != 0 {
+			sys.Chown(ctx, utils.Array(varPath), cfg.Uid, cfg.Gid, false)
+			sys.Chown(ctx, utils.Array(cfg.DirData, target), cfg.Uid, cfg.Gid, true)
 		}
 		return
 	}
@@ -114,7 +115,7 @@ func Run(cfg Config) func(ctx context.Context) error {
 
 		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
 
-		return cmdx.Exec(
+		return cmdx.Run(
 			log.Prefix(ctx, "exec"),
 			FILE_PAN_XUNLEI_CLI,
 			cmdx.Flags(
@@ -128,12 +129,35 @@ func Run(cfg Config) func(ctx context.Context) error {
 			cmdx.LineErr(logPan(ctx, "[stderr] ")),
 			cmdx.LineOut(logPan(ctx, "[stdout] ")),
 			cmdx.PreStart(func(c *cmdx.Cmd) error {
-				return cmdx.Exec(ctx,
-					FILE_PAN_XUNLEI_CLI,
-					cmdx.Dir(DIR_SYNOPKG_WORK),
-					cmdx.Env(append(os.Environ(), "LD_TRACE_LOADED_OBJECTS=1")),
-					cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
-				)
+				ctx := log.Prefix(ctx, "check")
+				s, err := os.Stat(FILE_PAN_XUNLEI_CLI)
+				if err != nil {
+					slog.DebugContext(ctx, "check cli fail", "err", err)
+					return err
+				}
+				slog.DebugContext(ctx, "check cli", "perm", s.Mode().Perm(), "modtime", s.ModTime())
+
+				err = fo.WalkDir(DIR_SYNOPKG_WORK, func(path string, d fs.DirEntry) error {
+					slog.DebugContext(ctx, "check workdir", "file", path)
+					return nil
+				})
+				if err != nil {
+					slog.DebugContext(ctx, "check workdir fail", "err", err)
+					return err
+				}
+
+				cmd := exec.CommandContext(ctx, "sh", "-c", "LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				cmd.Dir = DIR_SYNOPKG_WORK
+				cmd.Env = append(cmd.Env, "LD_TRACE_LOADED_OBJECTS=1")
+				return cmd.Run()
+				// return cmdx.Run(ctx,
+				// 	FILE_PAN_XUNLEI_CLI,
+				// 	cmdx.Dir(DIR_SYNOPKG_WORK),
+				// 	cmdx.Env(append(envs, "LD_TRACE_LOADED_OBJECTS=1")),
+				// 	cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
+				// )
 			}),
 			cmdx.OnStarted(func(c *cmdx.Cmd) error {
 				done := utils.BackExec(func() {

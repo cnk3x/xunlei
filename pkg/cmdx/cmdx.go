@@ -20,7 +20,7 @@ type Cmd struct {
 
 type cmd = exec.Cmd
 
-func Exec(ctx context.Context, name string, options ...Option) (err error) {
+func Run(ctx context.Context, name string, options ...Option) (err error) {
 	defer log.LogDone(ctx, slog.LevelDebug, filepath.Base(name), &err).Defer()
 	ctx, cancel := context.WithCancelCause(ctx)
 

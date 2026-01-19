@@ -22,8 +22,8 @@ type Config struct {
 
 	DirDownload      []string //下载保存文件夹，可多次指定，需确保有权限访问
 	DirData          string   //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
-	Uid              uint32   //运行迅雷的用户ID
-	Gid              uint32   //运行迅雷的用户组ID
+	Uid              int      //运行迅雷的用户ID
+	Gid              int      //运行迅雷的用户组ID
 	PreventUpdate    bool     //阻止更新
 	Root             string   //主目录
 	SpkUrl           string   //下载链接

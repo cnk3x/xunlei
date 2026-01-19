@@ -136,23 +136,23 @@ func chrootRun(ctx context.Context, root string, run func() error, options optio
 		defer func() { check("fchdir", syscall.Fchdir(fd), "fd", fd) }()
 	}
 
-	if oEUid, oEGid := syscall.Geteuid(), syscall.Getegid(); options.uid != oEUid || options.gid != oEGid {
+	if options.uid > 0 || options.gid > 0 {
 		if err = check("check root", checkUid("chroot")); err != nil {
 			return
 		}
 
-		if options.gid != oEGid {
+		if options.gid > 0 {
 			if err = check("setegid", syscall.Setegid(options.gid), "gid", options.gid); err != nil {
 				return
 			}
-			defer func() { check("setegid", syscall.Setegid(oEGid), "gid", oEGid) }()
+			defer func() { check("setegid", syscall.Setegid(0), "gid", 0) }()
 		}
 
-		if options.uid != oEUid {
+		if options.uid > 0 {
 			if err = check("seteuid", syscall.Setegid(options.uid), "uid", options.uid); err != nil {
 				return
 			}
-			defer func() { check("seteuid", syscall.Setegid(oEUid), "uid", oEUid) }()
+			defer func() { check("seteuid", syscall.Setegid(0), "uid", 0) }()
 		}
 	}
 
