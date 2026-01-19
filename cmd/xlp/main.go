@@ -46,7 +46,7 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("force_download: %t", cfg.ForceDownload))
 
 	err := vms.Exec(
-		log.Prefix(ctx, "boot"),
+		log.Prefix(ctx, "vms"),
 
 		vms.Before(xunlei.Before(cfg)),
 		vms.Run(xunlei.Run(cfg)),

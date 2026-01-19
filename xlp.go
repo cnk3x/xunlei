@@ -96,8 +96,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		slog.InfoContext(ctx, "app start")
-		defer slog.InfoContext(ctx, "app done")
+		defer log.LogDone(ctx, slog.LevelInfo, "xlp", &err)
 
 		ctx, cancel := context.WithCancelCause(ctx)
 		defer cancel(fmt.Errorf("done"))
@@ -114,27 +113,8 @@ func Run(cfg Config) func(ctx context.Context) error {
 
 		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
 
-		webStart := func(c *cmdx.Cmd) error {
-			if cfg.Debug {
-				cmdx.Exec(ctx,
-					FILE_PAN_XUNLEI_CLI,
-					cmdx.Dir(DIR_SYNOPKG_WORK),
-					cmdx.Env(append(os.Environ(), "LD_TRACE_LOADED_OBJECTS=1")),
-					cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
-				)
-			}
-			utils.BackExec(func() {
-				if err := webRun(ctx, envs, cfg); err != nil {
-					cancel(err)
-				} else {
-					cancel(fmt.Errorf("web done"))
-				}
-			})
-			return nil
-		}
-
 		return cmdx.Exec(
-			log.Prefix(ctx, "vms"),
+			log.Prefix(ctx, "exec"),
 			FILE_PAN_XUNLEI_CLI,
 			cmdx.Flags(
 				"-launcher_listen", "unix://"+SOCK_LAUNCHER_LISTEN,
@@ -146,7 +126,23 @@ func Run(cfg Config) func(ctx context.Context) error {
 			cmdx.Env(envs),
 			cmdx.LineErr(logPan(ctx, "[stderr] ")),
 			cmdx.LineOut(logPan(ctx, "[stdout] ")),
-			cmdx.OnStarted(webStart),
+			cmdx.PreStart(func(c *cmdx.Cmd) error {
+				return cmdx.Exec(ctx,
+					FILE_PAN_XUNLEI_CLI,
+					cmdx.Dir(DIR_SYNOPKG_WORK),
+					cmdx.Env(append(os.Environ(), "LD_TRACE_LOADED_OBJECTS=1")),
+					cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
+				)
+			}),
+			cmdx.OnStarted(func(c *cmdx.Cmd) error {
+				done := utils.BackExec(func() {
+					if err := webRun(ctx, envs, cfg); err != nil {
+						cancel(err)
+					}
+				})
+				utils.After(done, func() { cancel(fmt.Errorf("web done")) })
+				return nil
+			}),
 			cmdx.OnExit(func(c *cmdx.Cmd) error { return cleanExit(DIR_VAR) }),
 		)
 	}
@@ -154,6 +150,8 @@ func Run(cfg Config) func(ctx context.Context) error {
 
 func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	ctx = log.Prefix(ctx, "web")
+	defer log.LogDone(ctx, slog.LevelInfo, "web", &err)
+
 	mux := web.NewMux()
 	mux.Recoverer()
 
