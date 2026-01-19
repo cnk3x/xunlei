@@ -32,8 +32,8 @@ type options struct {
 //   - chroot + seteuid 实现权限最小化（临时降权）
 //   - 执行顺序 root 启动 → 准备 chroot 监狱 → chroot 切换 → setegid/seteuid 降权 → 执行核心任务 → 恢复 root 权限
 func Exec(ctx context.Context, execOpts ...Option) (err error) {
-	slog.InfoContext(ctx, "start boot")
-	defer slog.InfoContext(ctx, "stopped")
+	slog.InfoContext(ctx, "vms start")
+	defer slog.InfoContext(ctx, "vms done")
 
 	var opts options
 	for _, option := range execOpts {
@@ -59,10 +59,14 @@ func Exec(ctx context.Context, execOpts ...Option) (err error) {
 	}
 
 	run := func(ctx context.Context) error {
-		if opts.run == nil {
-			return nil
-		}
-		return sys.RunAs(ctx, opts.uid, opts.gid, func() error { return opts.run(ctx) })
+		slog.InfoContext(ctx, "runner start")
+		defer slog.InfoContext(ctx, "runner done")
+		return sys.RunAs(ctx, opts.uid, opts.gid, func() error {
+			if opts.run == nil {
+				return nil
+			}
+			return opts.run(ctx)
+		})
 	}
 
 	if opts.root == "" || opts.root == "/" {

@@ -115,6 +115,14 @@ func Run(cfg Config) func(ctx context.Context) error {
 		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
 
 		webStart := func(c *cmdx.Cmd) error {
+			if cfg.Debug {
+				cmdx.Exec(ctx,
+					FILE_PAN_XUNLEI_CLI,
+					cmdx.Dir(DIR_SYNOPKG_WORK),
+					cmdx.Env(append(os.Environ(), "LD_TRACE_LOADED_OBJECTS=1")),
+					cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
+				)
+			}
 			utils.BackExec(func() {
 				if err := webRun(ctx, envs, cfg); err != nil {
 					cancel(err)
