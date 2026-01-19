@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -146,12 +145,20 @@ func Run(cfg Config) func(ctx context.Context) error {
 					return err
 				}
 
-				cmd := exec.CommandContext(ctx, "sh", "-c", "LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				cmd.Dir = DIR_SYNOPKG_WORK
-				cmd.Env = append(cmd.Env, "LD_TRACE_LOADED_OBJECTS=1")
-				return cmd.Run()
+				ctx, cancel := context.WithTimeout(ctx, time.Second*3)
+				defer cancel()
+				return cmdx.Shell(ctx,
+					"LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI, cmdx.SlogDebug("check"),
+					cmdx.Env(envs), cmdx.Dir(DIR_SYNOPKG_WORK),
+				)
+
+				// cmd := exec.CommandContext(ctx, "sh", "-c", "LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI)
+				// cmd.Stdout = os.Stdout
+				// cmd.Stderr = os.Stderr
+				// cmd.Dir = DIR_SYNOPKG_WORK
+				// cmd.Env = append(cmd.Env, "LD_TRACE_LOADED_OBJECTS=1")
+				// return cmd.Run()
+
 				// return cmdx.Run(ctx,
 				// 	FILE_PAN_XUNLEI_CLI,
 				// 	cmdx.Dir(DIR_SYNOPKG_WORK),
