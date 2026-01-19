@@ -16,8 +16,11 @@ func init() {
 	pflag.ErrHelp = fmt.Errorf("\nstart with %s [...OPTIONS]", filepath.Base(os.Args[0]))
 	pflag.Usage = func() {
 		fmt.Fprint(os.Stderr, filepath.Base(os.Args[0]))
-		if Version != "" {
-			fmt.Fprint(os.Stderr, " - version "+Version)
+		if version != "" {
+			fmt.Fprintf(os.Stderr, " - version %s", version)
+		}
+		if !buildTime.IsZero() {
+			fmt.Fprintf(os.Stderr, " - build %s", buildTime.In(time.Local).Format(time.RFC3339))
 		}
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "wrap system env as synology for xunlei")
@@ -29,8 +32,15 @@ func init() {
 
 var (
 	CommandLine = pflag.CommandLine
-	Version     string
+
+	version   string
+	buildTime time.Time
 )
+
+func SetBuildTime(t time.Time) { buildTime = t }
+func SetVersion(v string)      { version = v }
+func GetBuildTime() time.Time  { return buildTime }
+func GetVersion() string       { return version }
 
 type FlagSet = pflag.FlagSet
 

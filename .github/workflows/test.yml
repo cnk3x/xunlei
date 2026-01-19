@@ -40,6 +40,10 @@ jobs:
           echo "v_date: ${v_date}"
           echo "v_test: ${v_test}"
 
+          build_time=$(date -Is)
+          echo "build_time=${build_time}" >> $GITHUB_OUTPUT
+          echo "build_time: ${build_time}"
+
       - name: 配置环境
         uses: actions/setup-go@v6
         with:
@@ -47,8 +51,8 @@ jobs:
 
       - name: 编译程序
         run: |
-          GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
-          GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
+          GOARCH=amd64 go build -ldflags="-s -w -X main.BuildTime=${{ steps.version.outputs.build_time }}" -trimpath -o ./artifacts/xlp-amd64 ./cmd/xlp
+          GOARCH=arm64 go build -ldflags="-s -w -X main.BuildTime=${{ steps.version.outputs.build_time }}" -trimpath -o ./artifacts/xlp-arm64 ./cmd/xlp
           ls -lh ./artifacts
         env:
           CGO_ENABLED: 0

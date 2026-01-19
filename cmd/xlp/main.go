@@ -7,12 +7,25 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cnk3x/xunlei"
+	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms"
 )
+
+var BuildTime string
+
+func init() {
+	flags.SetVersion(xunlei.Version)
+	if BuildTime != "" {
+		if bt, err := time.Parse(time.RFC3339, BuildTime); err == nil {
+			flags.SetBuildTime(bt)
+		}
+	}
+}
 
 func main() {
 	var cfg xunlei.Config
@@ -31,6 +44,7 @@ func main() {
 	slog.InfoContext(ctx, ` \/  |  | |\ | |    |___  |`)
 	slog.InfoContext(ctx, `_/\_ |__| | \| |___ |___  |`)
 	slog.InfoContext(ctx, fmt.Sprintf(`daemon version: %s`, xunlei.Version))
+	slog.InfoContext(ctx, fmt.Sprintf(`build time: %s`, flags.GetBuildTime().In(time.Local).Format(time.RFC3339)))
 	slog.InfoContext(ctx, fmt.Sprintf("debug: %t", cfg.Debug))
 	slog.InfoContext(ctx, fmt.Sprintf("port: %d", cfg.Port))
 	slog.InfoContext(ctx, fmt.Sprintf("ip: %s", cfg.Ip))
