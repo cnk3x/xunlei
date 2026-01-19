@@ -145,6 +145,20 @@ func Run(cfg Config) func(ctx context.Context) error {
 					return err
 				}
 
+				err = fo.WalkDir("/lib", func(path string, d fs.DirEntry) error {
+					slog.DebugContext(ctx, "check lib", "file", path)
+					return nil
+				})
+				if err != nil {
+					slog.DebugContext(ctx, "check lib fail", "err", err)
+					return err
+				}
+
+				for _, n := range envs {
+					k, v, _ := strings.Cut(n, "=")
+					slog.DebugContext(ctx, "check env", k, v)
+				}
+
 				ctx, cancel := context.WithTimeout(ctx, time.Second*3)
 				defer cancel()
 				return cmdx.Shell(ctx,
