@@ -13,6 +13,7 @@ import (
 	"github.com/cnk3x/xunlei"
 	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/log"
+	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms"
 )
 
@@ -51,7 +52,7 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("port: %d", cfg.Port))
 	slog.InfoContext(ctx, fmt.Sprintf("ip: %s", cfg.Ip))
 	slog.InfoContext(ctx, fmt.Sprintf("dashboard username: %s", cfg.DashboardUsername))
-	slog.InfoContext(ctx, fmt.Sprintf("dashboard password: %s", cfg.DashboardPassword))
+	slog.InfoContext(ctx, fmt.Sprintf("dashboard password: %s", utils.PasswordMask(cfg.DashboardPassword)))
 	for i, dir := range cfg.DirDownload {
 		slog.InfoContext(ctx, fmt.Sprintf("dir download.%d: %s", i+1, dir))
 	}

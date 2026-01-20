@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 func HumanBytes[T UintT | IntT](n T, prec ...int) string {
@@ -16,4 +17,11 @@ func HumanBytes[T UintT | IntT](n T, prec ...int) string {
 		}
 	}
 	return fmt.Sprintf("%d bytes", n)
+}
+
+func PasswordMask(s string) string {
+	if len(s) <= 1 {
+		return strings.Repeat("*", len(s))
+	}
+	return s[:1] + strings.Repeat("*", len(s[1:]))
 }
