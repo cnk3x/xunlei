@@ -88,6 +88,7 @@ func ConfigBind(cfg *Config) (err error) {
 			}
 		}
 	}
+	cfg.DirDownload = dirDownloads
 
 	if len(cfg.DirDownload) == 0 {
 		cfg.DirDownload = utils.Array(filepath.Join(cfg.Root, "downloads"))
