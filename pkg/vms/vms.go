@@ -82,6 +82,7 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 
 	if err != nil && opts.wait {
 		slog.ErrorContext(ctx, "chroot run", "err", err.Error())
+		slog.WarnContext(ctx, "调试模式，在有错误发生的情况下，会一直不退出，等待人工调试，请按 ctrl+c 退出.")
 		<-ctx.Done()
 	}
 

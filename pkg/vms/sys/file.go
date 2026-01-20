@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -23,10 +24,16 @@ func NewFile(ctx context.Context, fn string, process fo.Process, fopts ...fo.Opt
 
 	if err = fo.OpenWrite(fn, process, append(fopts, fo.FlagExcl(false))...); err == nil {
 		bq.Put(newRm(ctx, fn, "rmfile"))
+		slog.DebugContext(ctx, "file", "path", fn)
 	}
 
 	if exists := os.IsExist(err); err != nil && exists {
 		err = nil
+		slog.DebugContext(ctx, "file skip", "path", fn, "cause", "exists")
+	}
+
+	if err != nil {
+		slog.DebugContext(ctx, "file fail", "path", fn, "err", err.Error())
 	}
 
 	return

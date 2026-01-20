@@ -9,16 +9,11 @@ import (
 // Level sets the log level
 func Level(logger *slog.Logger, level string) {
 	if h, ok := logger.Handler().(*handler); ok {
-		switch level {
-		case "debug":
-			h.level = slog.LevelDebug
-		case "info", "information":
-			h.level = slog.LevelInfo
-		case "warn", "warning":
-			h.level = slog.LevelWarn
-		case "error", "err":
-			h.level = slog.LevelError
+		var def slog.Level = slog.LevelInfo
+		if h.level != nil {
+			def = h.level.Level()
 		}
+		h.level = LevelFromString(level, def)
 	}
 }
 

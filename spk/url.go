@@ -100,7 +100,7 @@ func allExists(ctx context.Context, dir string) bool {
 			slog.DebugContext(ctx, "check spk fail", "file", f, "err", err)
 			return false
 		}
-		slog.DebugContext(ctx, "check spk", "size", utils.HumanBytes(stat.Size()), "modtime", stat.ModTime(), "file", f)
+		slog.DebugContext(ctx, "check spk", "perm", stat.Mode().Perm().String(), "size", utils.HumanBytes(stat.Size()), "modtime", stat.ModTime(), "file", f)
 	}
 	return true
 }

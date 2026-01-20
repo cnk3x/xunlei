@@ -13,7 +13,6 @@ import (
 	"github.com/cnk3x/xunlei"
 	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms"
 )
 
@@ -40,8 +39,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.ForDefault(utils.Iif(cfg.Debug, "debug", "info"), false)
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -51,7 +48,6 @@ func main() {
 	slog.InfoContext(ctx, `_/\_ |__| | \| |___ |___  |`)
 	slog.InfoContext(ctx, fmt.Sprintf(`daemon version: %s`, xunlei.Version))
 	slog.InfoContext(ctx, fmt.Sprintf(`build time: %s`, flags.GetBuildTime().In(time.Local).Format(time.RFC3339)))
-	slog.InfoContext(ctx, fmt.Sprintf("debug: %t", cfg.Debug))
 	slog.InfoContext(ctx, fmt.Sprintf("port: %d", cfg.Port))
 	slog.InfoContext(ctx, fmt.Sprintf("ip: %s", cfg.Ip))
 	slog.InfoContext(ctx, fmt.Sprintf("dashboard username: %s", cfg.DashboardUsername))
@@ -64,6 +60,8 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("spk_url: %s", cfg.SpkUrl))
 	slog.InfoContext(ctx, fmt.Sprintf("spk_force_download: %t", cfg.SpkForceDownload))
 	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
+	slog.InfoContext(ctx, fmt.Sprintf("log: %s", cfg.Log))
+	slog.InfoContext(ctx, fmt.Sprintf("debug: %t", cfg.Debug))
 
 	err := vms.Execute(
 		log.Prefix(ctx, "vms"),

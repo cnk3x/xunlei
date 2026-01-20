@@ -215,14 +215,12 @@ func mockSyno(ctx context.Context, root string) (undo func(), err error) {
 	if err = e; err != nil {
 		return
 	}
-	slog.DebugContext(ctx, "file", "path", FILE_SYNO_INFO_CONF)
 	bq.Put(u1)
 
-	u2, e := sys.NewFile(ctx, FILE_SYNO_AUTHENTICATE_CGI, authenticate_cgi.WriteTo)
+	u2, e := sys.NewFile(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI), authenticate_cgi.WriteTo)
 	if err = e; err != nil {
 		return
 	}
-	slog.DebugContext(ctx, "file", "path", FILE_SYNO_AUTHENTICATE_CGI)
 	bq.Put(u2)
 
 	return
