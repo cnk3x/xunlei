@@ -140,6 +140,10 @@ func Run(cfg Config) func(ctx context.Context) error {
 				slog.DebugContext(ctx, "check uid", "uid", os.Geteuid(), "gid", os.Getegid())
 				return nil
 			}),
+			cmdx.OnStarted(func(c *cmdx.Cmd) error {
+				slog.InfoContext(ctx, "started", "cmdline", c.String(), "dir", c.Dir, "pid", c.Process.Pid)
+				return nil
+			}),
 			cmdx.OnExit(func(c *cmdx.Cmd) error { cancel(); return cleanExit(DIR_VAR) }),
 		)
 	}
@@ -149,6 +153,7 @@ func webRun(ctx context.Context, env []string, cfg Config, onDone func()) {
 	defer onDone()
 	mux := web.NewMux()
 	mux.Recoverer()
+	mux.OnStarted(func(addr string) { slog.InfoContext(ctx, "started", "listen", addr) })
 
 	mux.Handle("/webman/status",
 		web.FBlob(

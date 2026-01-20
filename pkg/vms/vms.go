@@ -7,6 +7,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
@@ -97,74 +98,110 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 
 // chroot & run
 func chrootRun(ctx context.Context, root string, run func(ctx context.Context) error, opts options) (err error) {
-	check := func(name string, err error, args ...any) error {
-		if err == nil {
-			slog.DebugContext(ctx, "call "+name, args...)
-			// } else {
-			// 	slog.DebugContext(ctx, "call "+name, append(args, "err", err)...)
-		}
-		return err
-	}
-
-	checkUid := func(name string) (err error) {
-		if syscall.Getuid() != 0 {
-			err = fmt.Errorf("%s: only the root process (UID=0) supports.", name)
-		}
+	chRootBack, e := chroot(ctx, root)
+	if err = e; err != nil {
 		return
 	}
+	defer chRootBack()
+
+	chUserBack, e := chuser(ctx, opts.uid, opts.gid)
+	if err = e; err != nil {
+		return
+	}
+	defer chUserBack()
+
+	err = run(ctx)
+	return
+}
+
+func chroot(ctx context.Context, root string) (rollback func(), err error) {
+	slog.InfoContext(ctx, "chroot start", "root", root)
+	defer slog.InfoContext(ctx, "chroot done")
+
+	bq := utils.BackQueue(&rollback, &err)
+	defer bq.ErrDefer()
+
+	bq.Put(func() { slog.InfoContext(ctx, "chroot rollback done") })
+	defer bq.Put(func() { slog.InfoContext(ctx, "chroot rollback start") })
 
 	if root != "" && root != "/" {
-		if err = check("check root", checkUid("chroot")); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "check root", checkUid("chroot")); err != nil {
 			return
 		}
 
 		wd, e := os.Getwd()
-		if err = check("getwd", e, "wd", wd); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "getwd", e, "wd", wd); err != nil {
 			return
 		}
 
 		fd, e := syscall.Open("/", syscall.O_RDONLY, 0)
-		if err = check("openFd", e, "dir", "/", "fd", fd); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "openFd", e, "dir", "/", "fd", fd); err != nil {
 			return
 		}
-		defer func() { check("closeFd", syscall.Close(fd), "fd", fd) }()
+		bq.Put(func() { errcheck(ctx, slog.LevelDebug, "closeFd", syscall.Close(fd), "fd", fd) })
 
-		if err = check("chdir", os.Chdir(root), "dir", root); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "chdir", os.Chdir(root), "dir", root); err != nil {
 			return
 		}
-		defer func() { check("chdir", os.Chdir(wd), "dir", wd) }()
+		bq.Put(func() { errcheck(ctx, slog.LevelDebug, "chdir", os.Chdir(wd), "dir", wd) })
 
-		if err = check("chroot", syscall.Chroot("."), "dir", "."); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "chroot", syscall.Chroot("."), "dir", "."); err != nil {
 			return
 		}
-		defer func() { check("chroot", syscall.Chroot("."), "fd", fd) }()
-		defer func() { check("fchdir", syscall.Fchdir(fd), "fd", fd) }()
+		bq.Put(func() { errcheck(ctx, slog.LevelDebug, "chroot", syscall.Chroot("."), "fd", fd) })
+		bq.Put(func() { errcheck(ctx, slog.LevelDebug, "fchdir", syscall.Fchdir(fd), "fd", fd) })
 
-		if err = check("chdir", os.Chdir("/"), "dir", "/"); err != nil {
+		if err = errcheck(ctx, slog.LevelDebug, "chdir", os.Chdir("/"), "dir", "/"); err != nil {
 			return
 		}
 	}
+	return
+}
 
-	if opts.uid > 0 || opts.gid > 0 {
-		if err = check("check root", checkUid("chroot")); err != nil {
+func chuser(ctx context.Context, uid, gid int) (rollback func(), err error) {
+	slog.InfoContext(ctx, "chuser start", "uid", uid, "gid", gid)
+	defer slog.InfoContext(ctx, "chuser done")
+
+	bq := utils.BackQueue(&rollback, &err)
+	defer bq.ErrDefer()
+
+	bq.Put(func() { slog.InfoContext(ctx, "chuser rollback done") })
+	defer bq.Put(func() { slog.InfoContext(ctx, "chuser rollback start") })
+
+	if uid > 0 || gid > 0 {
+		if err = errcheck(ctx, slog.LevelDebug, "check root", checkUid("chroot")); err != nil {
 			return
 		}
 
-		if opts.gid > 0 {
-			if err = check("setegid", syscall.Setegid(opts.gid), "gid", opts.gid); err != nil {
+		if gid > 0 {
+			if err = errcheck(ctx, slog.LevelInfo, "setegid", syscall.Setegid(gid), "gid", gid); err != nil {
 				return
 			}
-			defer func() { check("setegid", syscall.Setegid(0), "gid", 0) }()
+			bq.Put(func() { errcheck(ctx, slog.LevelInfo, "setegid", syscall.Setegid(0), "gid", 0) })
 		}
 
-		if opts.uid > 0 {
-			if err = check("seteuid", syscall.Seteuid(opts.uid), "uid", opts.uid); err != nil {
+		if uid > 0 {
+			if err = errcheck(ctx, slog.LevelInfo, "seteuid", syscall.Seteuid(uid), "uid", uid); err != nil {
 				return
 			}
-			defer func() { check("seteuid", syscall.Seteuid(0), "uid", 0) }()
+			bq.Put(func() { errcheck(ctx, slog.LevelInfo, "seteuid", syscall.Seteuid(0), "uid", 0) })
 		}
 	}
+	return
+}
 
-	err = run(ctx)
+func errcheck(ctx context.Context, level slog.Level, name string, err error, args ...any) error {
+	if err == nil {
+		slog.Log(ctx, level, "call "+name, args...)
+	} else {
+		slog.Log(ctx, utils.Iif(level < 0, level, slog.LevelWarn), "call "+name, append(args, "err", err.Error())...)
+	}
+	return err
+}
+
+func checkUid(name string) (err error) {
+	if syscall.Getuid() != 0 {
+		err = fmt.Errorf("%s: only the root process (UID=0) supports.", name)
+	}
 	return
 }
