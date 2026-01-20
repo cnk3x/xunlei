@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"path/filepath"
+	"strings"
 
 	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/log"
@@ -77,6 +78,15 @@ func ConfigBind(cfg *Config) (err error) {
 	cfg.DirData = cmp.Or(cfg.DirData, filepath.Join(cfg.Root, "data"))
 	if cfg.DirData, err = filepath.Abs(cfg.DirData); err != nil {
 		return
+	}
+
+	var dirDownloads []string
+	for _, dir := range cfg.DirDownload {
+		for d := range strings.SplitSeq(dir, ":") {
+			if d = strings.TrimSpace(d); d != "" {
+				dirDownloads = append(dirDownloads, d)
+			}
+		}
 	}
 
 	if len(cfg.DirDownload) == 0 {

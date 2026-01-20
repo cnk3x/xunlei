@@ -53,6 +53,7 @@ var (
 	SYNO_VERSION  = SYNO_PLATFORM + " dsm " + SYNOPKG_DSM_VERSION_MAJOR + "." + SYNOPKG_DSM_VERSION_MINOR + "-" + SYNOPKG_DSM_VERSION_BUILD //系统版本
 )
 
+// 还在宿主机环境操作
 func Before(cfg Config) func(ctx context.Context) (func(), error) {
 	return func(ctx context.Context) (undo func(), err error) {
 		bq := utils.BackQueue(&undo, &err)
@@ -92,6 +93,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 	}
 }
 
+// 已chroot的操作
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
 		ctx, cancel := context.WithCancel(ctx)

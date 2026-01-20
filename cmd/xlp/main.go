@@ -52,7 +52,9 @@ func main() {
 	slog.InfoContext(ctx, fmt.Sprintf("ip: %s", cfg.Ip))
 	slog.InfoContext(ctx, fmt.Sprintf("dashboard username: %s", cfg.DashboardUsername))
 	slog.InfoContext(ctx, fmt.Sprintf("dashboard password: %s", cfg.DashboardPassword))
-	slog.InfoContext(ctx, fmt.Sprintf("dir download: %s", cfg.DirDownload))
+	for i, dir := range cfg.DirDownload {
+		slog.InfoContext(ctx, fmt.Sprintf("dir download.%d: %s", i+1, dir))
+	}
 	slog.InfoContext(ctx, fmt.Sprintf("dir data: %s", cfg.DirData))
 	slog.InfoContext(ctx, fmt.Sprintf("uid: %d", cfg.Uid))
 	slog.InfoContext(ctx, fmt.Sprintf("gid: %d", cfg.Gid))
