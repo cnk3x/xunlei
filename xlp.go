@@ -275,7 +275,6 @@ func timeParse(s string) (t time.Time, ok bool) {
 	}
 
 	var err error
-	s = strings.TrimSpace(s)
 	for _, l := range layouts {
 		if len(l.layout) == len(s) {
 			if l.inLocal {

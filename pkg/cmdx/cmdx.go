@@ -2,6 +2,7 @@ package cmdx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -20,15 +21,14 @@ type cmd = exec.Cmd
 func Run(ctx context.Context, name string, options ...Option) (err error) {
 	c := &Cmd{cmd: exec.CommandContext(ctx, name)}
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
 
-	closes, err := Options(options...)(c)
+	clean, err := Options(options...)(c)
 	if err != nil {
 		err = fmt.Errorf("cmdx options: %w", err)
 		return
 	}
-	defer closes()
+	defer clean()
 
 	if c.preStart != nil {
 		if err = c.preStart(c); err != nil {
@@ -40,27 +40,44 @@ func Run(ctx context.Context, name string, options ...Option) (err error) {
 	err = func() (err error) {
 		if err = c.Start(); err != nil {
 			slog.DebugContext(ctx, "start", "command", c.String(), "dir", c.Dir)
-			err = fmt.Errorf("cmdx start: %w", err)
-			return
+			return fmt.Errorf("cmdx start: %w", err)
 		}
-		slog.DebugContext(ctx, "started", "command", c.String(), "dir", c.Dir, "pid", c.Process.Pid)
+		slog.DebugContext(ctx, "cmdx started", "command", c.String(), "dir", c.Dir, "pid", c.Process.Pid)
 
 		if c.onStarted != nil {
 			if err = c.onStarted(c); err != nil {
-				err = fmt.Errorf("cmdx started: %w", err)
+				return fmt.Errorf("cmdx started: %w", err)
 			}
 		}
 
-		if e := c.Wait(); err == nil && e != nil {
-			err = fmt.Errorf("cmdx wait: %w", e)
+		if err = c.Wait(); err != nil {
+			if signal := GetSignal(err); signal != -1 {
+				slog.DebugContext(ctx, "cmdx signaled: %s(%d)", signal.String(), signal)
+				return
+			}
+			return fmt.Errorf("cmdx wait: %w", err)
 		}
+
 		return
 	}()
 
 	if c.onExit != nil {
 		if e := c.onExit(c); err == nil && e != nil {
-			err = fmt.Errorf("cmdx exit: %w", e)
+			err = e
 		}
 	}
 	return
+}
+
+// GetSignal 判断 cmd.Wait() 返回的错误是否为信号中断，返回-1代表不是。
+func GetSignal(err error) syscall.Signal {
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		return -1
+	}
+	ws, ok := ee.Sys().(syscall.WaitStatus)
+	if !ok || !ws.Signaled() {
+		return -1
+	}
+	return ws.Signal()
 }

@@ -91,7 +91,7 @@ func LineOut(lineRecv func(string)) Option {
 	return May(func(c *Cmd) Closer {
 		w := LineWriter(lineRecv)
 		c.Stdout, c.Stderr = w, w
-		return closerNe(w.Close)
+		return eClean(w)
 	})
 }
 
@@ -99,7 +99,7 @@ func LineErr(lineRecv func(string)) Option {
 	return May(func(c *Cmd) Closer {
 		w := LineWriter(lineRecv)
 		c.Stderr = w
-		return closerNe(w.Close)
+		return eClean(w)
 	})
 }
 
@@ -122,38 +122,40 @@ type iOption interface {
 }
 
 func May[O iOption](option O) func(*Cmd) (fc Closer, err error) {
-	return func(c *Cmd) (Closer, error) {
-		return apply(option, c)
+	return func(c *Cmd) (fc Closer, err error) {
+		fc = func() {}
+
+		if optApply, ok := any(option).(func(*Cmd) (Closer, error)); ok {
+			fc, err = optApply(c)
+			return
+		}
+
+		if optApply, ok := any(option).(func(*Cmd) Closer); ok {
+			fc = optApply(c)
+			return
+		}
+
+		if optApply, ok := any(option).(func(*Cmd) error); ok {
+			err = optApply(c)
+			return
+		}
+
+		if optApply, ok := any(option).(func(*Cmd)); ok {
+			optApply(c)
+			return
+		}
+
+		err = fmt.Errorf("[%T]%v: apply error", option, option)
+		return
 	}
 }
 
 type Closer = func()
 
-func closerNe[E any](f func() E) Closer { return func() { _ = f() } }
-
-func apply[MO iOption](option MO, t *Cmd) (fc Closer, err error) {
-	fc = func() {}
-
-	if optApply, ok := any(option).(func(*Cmd) (Closer, error)); ok {
-		fc, err = optApply(t)
-		return
+func eClean(closer io.Closer) Closer {
+	return func() {
+		if closer != nil {
+			_ = closer.Close()
+		}
 	}
-
-	if optApply, ok := any(option).(func(*Cmd) Closer); ok {
-		fc = optApply(t)
-		return
-	}
-
-	if optApply, ok := any(option).(func(*Cmd) error); ok {
-		err = optApply(t)
-		return
-	}
-
-	if optApply, ok := any(option).(func(*Cmd)); ok {
-		optApply(t)
-		return
-	}
-
-	err = fmt.Errorf("[%T]%v: apply error", option, option)
-	return
 }
