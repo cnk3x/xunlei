@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/cnk3x/xunlei/pkg/fo"
 	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
@@ -84,7 +85,7 @@ func allExists(ctx context.Context, dir string) bool {
 		filepath.Join(dir, "ui/index.cgi"),
 	}
 
-	version := utils.Cat(files[0])
+	version := fo.Cat(files[0], true)
 	if version == "" {
 		slog.DebugContext(ctx, "check spk fail, version not found")
 		return false

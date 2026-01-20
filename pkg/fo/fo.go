@@ -2,9 +2,7 @@ package fo
 
 import (
 	"cmp"
-	"context"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -87,21 +85,3 @@ func Lines[T ~string | ~[]byte](lines ...T) Process {
 
 // 什么都不干
 func Nop(w *os.File) error { return nil }
-
-func WriteFile(ctx context.Context, fn string, process Process, fopts ...Option) (undo func(), err error) {
-	var exists bool
-	undo = func() {
-		if exists {
-			if e := os.Remove(fn); e != nil {
-				slog.DebugContext(ctx, "remove syno info", "err", e)
-			}
-		}
-	}
-
-	err = OpenWrite(fn, process, append(fopts, FlagExcl(true))...)
-	if exists = err != nil && os.IsExist(err); exists {
-		err = nil
-	}
-
-	return
-}

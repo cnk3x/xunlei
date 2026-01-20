@@ -18,7 +18,6 @@ type LinkOptions struct {
 	Source   string
 	DirMode  fs.FileMode
 	Optional bool
-	Copy     bool
 }
 
 func Links(ctx context.Context, items []LinkOptions) (undo Undo, err error) {
@@ -36,10 +35,11 @@ func LinkRs(ctx context.Context, root string, items []LinkOptions) (undo Undo, e
 
 // link hard link, only for file
 func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
-	u := utils.MakeUndoPool(&undo, &err)
-	defer u.ErrDefer()
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
 
 	var real string
+	var act string
 	err = func() (err error) {
 		if real, err = filepath.EvalSymlinks(m.Source); err != nil {
 			return
@@ -49,13 +49,20 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		if err = e; err != nil {
 			return
 		}
-		u.Put(du)
+		bq.Put(du)
 
 		if err = os.Link(real, m.Target); !errors.Is(err, syscall.EXDEV) {
+			act = "link"
+			if err == nil {
+				bq.Put(newRm(ctx, m.Target, "unlink"))
+			}
 			return
 		}
 
-		err = fo.OpenRead(real, fo.ToFile(m.Target, fo.Perm(0777), fo.FlagExcl(false)))
+		act = "copy"
+		if err = fo.OpenRead(real, fo.ToFile(m.Target, fo.Perm(0777), fo.FlagExcl(false))); err == nil {
+			bq.Put(newRm(ctx, m.Target, "uncopy"))
+		}
 		return
 	}()
 
@@ -66,15 +73,67 @@ func Link(ctx context.Context, m LinkOptions) (undo Undo, err error) {
 		slog.Bool("optional", m.Optional),
 	}
 
-	if err != nil {
-		attrs = append(attrs, slog.String("err", err.Error()))
-	}
-
 	if os.IsExist(err) {
-		slog.LogAttrs(ctx, slog.LevelDebug, "link skip", attrs...)
+		attrs = append(attrs, slog.String("err", os.ErrExist.Error()))
+		slog.LogAttrs(ctx, slog.LevelDebug, act+" skip", attrs...)
+		err = nil
+	} else if os.IsNotExist(err) {
+		attrs = append(attrs, slog.String("err", os.ErrNotExist.Error()))
+		slog.LogAttrs(ctx, slog.LevelDebug, act+" skip", attrs...)
 		err = nil
 	} else {
-		logIt(ctx, err, m.Optional, "link", attrs...)
+		if err != nil {
+			attrs = append(attrs, slog.String("err", err.Error()))
+		}
+		logIt(ctx, err, m.Optional, act, attrs...)
+	}
+
+	return
+}
+
+func Symlinks(ctx context.Context, items []LinkOptions) (undo Undo, err error) {
+	return doMulti(ctx, items, Symlink)
+}
+
+func Symlink(ctx context.Context, m LinkOptions) (undo Undo, err error) {
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
+
+	err = func() (err error) {
+		var dirUndo Undo
+		if dirUndo, err = Mkdir(ctx, filepath.Dir(m.Target), m.DirMode); err != nil {
+			return
+		}
+		bq.Put(dirUndo)
+
+		if err = os.Symlink(m.Source, m.Target); err != nil {
+			return
+		}
+		bq.Put(newRm(ctx, m.Target, "unlink"))
+
+		return
+	}()
+
+	attrs := []slog.Attr{
+		slog.String("target", m.Target),
+		slog.String("source", m.Source),
+	}
+
+	act := "symlink"
+
+	if os.IsExist(err) {
+		attrs = append(attrs, slog.String("err", os.ErrExist.Error()))
+		slog.LogAttrs(ctx, slog.LevelDebug, act+" skip", attrs...)
+		err = nil
+	} else if os.IsNotExist(err) {
+		attrs = append(attrs, slog.String("err", os.ErrNotExist.Error()))
+		slog.LogAttrs(ctx, slog.LevelDebug, act+" skip", attrs...)
+		err = nil
+	} else {
+		if err != nil {
+			attrs = append(attrs, slog.String("err", err.Error()))
+		}
+		logIt(ctx, err, m.Optional, act, attrs...)
 	}
 
 	return

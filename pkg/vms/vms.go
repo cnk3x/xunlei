@@ -7,7 +7,6 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
@@ -15,13 +14,16 @@ import (
 type Option func(ro *options)
 
 type options struct {
-	root   string
-	uid    int
-	gid    int
-	wait   bool
-	mounts []sys.MountOptions
-	binds  []sys.BindOptions
-	links  []sys.LinkOptions
+	root string
+	uid  int
+	gid  int
+	wait bool
+
+	mounts  []sys.MountOptions
+	binds   []sys.BindOptions
+	links   []sys.LinkOptions
+	symbols []sys.LinkOptions
+
 	before func(ctx context.Context) (undo func(), err error)
 	after  func(ctx context.Context, err error) error
 	run    func(ctx context.Context) error
@@ -32,8 +34,6 @@ type options struct {
 //   - chroot + seteuid 实现权限最小化（临时降权）
 //   - 执行顺序 root 启动 → 准备 chroot 监狱 → chroot 切换 → setegid/seteuid 降权 → 执行核心任务 → 恢复 root 权限
 func Execute(ctx context.Context, execOpts ...Option) (err error) {
-	defer log.LogDone(ctx, slog.LevelInfo, "vms", &err).Defer()
-
 	var opts options
 	for _, option := range execOpts {
 		option(&opts)
@@ -60,6 +60,12 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 			return
 		}
 		defer unlinks()
+
+		unSymlinks, e := sys.Symlinks(ctx, opts.symbols)
+		if err = e; err != nil {
+			return
+		}
+		defer unSymlinks()
 	}
 
 	//before
@@ -72,14 +78,14 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 	}
 
 	//chroot
-	err = chrootRun(ctx, opts.root,
-		func() error {
-			defer log.LogDone(ctx, slog.LevelInfo, "runner", &err).Defer()
-			return opts.run(ctx)
-		},
-		opts,
-	)
+	err = chrootRun(ctx, opts.root, opts.run, opts)
 
+	if err != nil && opts.wait {
+		slog.ErrorContext(ctx, "chroot run", "err", err.Error())
+		<-ctx.Done()
+	}
+
+	//after
 	if opts.after != nil {
 		if err = opts.after(ctx, err); err != nil {
 			return
@@ -89,12 +95,12 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 }
 
 // chroot & run
-func chrootRun(ctx context.Context, root string, run func() error, options options) (err error) {
+func chrootRun(ctx context.Context, root string, run func(ctx context.Context) error, opts options) (err error) {
 	check := func(name string, err error, args ...any) error {
-		if err != nil {
-			slog.DebugContext(ctx, "call "+name, append(args, "err", err)...)
-		} else {
+		if err == nil {
 			slog.DebugContext(ctx, "call "+name, args...)
+			// } else {
+			// 	slog.DebugContext(ctx, "call "+name, append(args, "err", err)...)
 		}
 		return err
 	}
@@ -130,34 +136,34 @@ func chrootRun(ctx context.Context, root string, run func() error, options optio
 		if err = check("chroot", syscall.Chroot("."), "dir", "."); err != nil {
 			return
 		}
+		defer func() { check("chroot", syscall.Chroot("."), "fd", fd) }()
+		defer func() { check("fchdir", syscall.Fchdir(fd), "fd", fd) }()
+
 		if err = check("chdir", os.Chdir("/"), "dir", "/"); err != nil {
 			return
 		}
-		defer func() { check("fchdir", syscall.Fchdir(fd), "fd", fd) }()
 	}
 
-	if options.uid > 0 || options.gid > 0 {
+	if opts.uid > 0 || opts.gid > 0 {
 		if err = check("check root", checkUid("chroot")); err != nil {
 			return
 		}
 
-		if options.gid > 0 {
-			if err = check("setegid", syscall.Setegid(options.gid), "gid", options.gid); err != nil {
+		if opts.gid > 0 {
+			if err = check("setegid", syscall.Setegid(opts.gid), "gid", opts.gid); err != nil {
 				return
 			}
 			defer func() { check("setegid", syscall.Setegid(0), "gid", 0) }()
 		}
 
-		if options.uid > 0 {
-			if err = check("seteuid", syscall.Setegid(options.uid), "uid", options.uid); err != nil {
+		if opts.uid > 0 {
+			if err = check("seteuid", syscall.Seteuid(opts.uid), "uid", opts.uid); err != nil {
 				return
 			}
-			defer func() { check("seteuid", syscall.Setegid(0), "uid", 0) }()
+			defer func() { check("seteuid", syscall.Seteuid(0), "uid", 0) }()
 		}
 	}
 
-	if err = check("run", run()); err != nil && options.wait {
-		<-ctx.Done()
-	}
+	err = run(ctx)
 	return
 }

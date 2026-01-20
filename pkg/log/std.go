@@ -56,18 +56,3 @@ func (w *stdWriter) Write(buf []byte) (int, error) {
 	r := slog.NewRecord(time.Now(), level, string(buf), pc)
 	return origLen, w.h.Handle(w.ctx, r)
 }
-
-func LogDone(ctx context.Context, level slog.Level, module string, err *error, args ...any) (r struct{ Defer func() }) {
-	if module != "" {
-		module += " "
-	}
-	slog.Log(ctx, level, module+"begin", args...)
-	r.Defer = func() {
-		if err != nil && *err != nil {
-			slog.Log(ctx, level, module+"done", "err", (*err).Error())
-		} else {
-			slog.Log(ctx, level, module+"done")
-		}
-	}
-	return
-}

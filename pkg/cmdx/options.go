@@ -13,18 +13,18 @@ import (
 	"github.com/cnk3x/xunlei/pkg/utils"
 )
 
-type Option = func(*Cmd) (Undo, error)
+type Option = func(*Cmd) (Closer, error)
 
 func Options(options ...Option) Option {
-	return func(c *Cmd) (undo Undo, err error) {
-		pUndo := utils.MakeUndoPool(&undo, &err)
-		defer pUndo.ErrDefer()
+	return func(c *Cmd) (closer Closer, err error) {
+		bq := utils.BackQueue(&closer, &err)
+		defer bq.ErrDefer()
 		for _, option := range options {
-			var closer Undo
-			if closer, err = option(c); err != nil {
+			fc, e := option(c)
+			if err = e; err != nil {
 				return
 			}
-			pUndo.Put(closer)
+			bq.Put(fc)
 		}
 		return
 	}
@@ -39,6 +39,7 @@ func ProcAttr(options ...Option) Option {
 	return Options(slices.Insert(options, 0, attrInit)...)
 }
 
+// Credential 以另外的身份运行外部程序
 func Credential(uid, gid uint32) Option {
 	var currentUid = os.Getuid()
 	return ProcAttr(May(func(c *Cmd) error {
@@ -52,12 +53,17 @@ func Credential(uid, gid uint32) Option {
 	}))
 }
 
+// Args 覆盖设置外部程序运行参数，替换掉 `exec.Command(name, args...)` 中所有的args
 func Args(args ...string) Option {
 	return May(func(c *Cmd) { c.Args = append(c.Args[:1], args...) })
 }
 
 const True = "___true"
 
+// Flags 覆盖设置外部程序运行参数，以两个一对键值对分割
+//   - 如果是无值参数，需添加[cmdx.True]来占位
+//   - 如果提供的键或值为空，该方法会自动忽略。
+//   - 有空值要求的，请使用 [cmdx.Args] 选项
 func Flags(args ...string) Option {
 	var selectedArgs []string
 	for i := 0; i < len(args)-1; i += 2 {
@@ -81,23 +87,19 @@ func PreStart(f func(*Cmd) error) Option  { return May(func(c *Cmd) { c.preStart
 func OnStarted(f func(*Cmd) error) Option { return May(func(c *Cmd) { c.onStarted = f }) }
 func OnExit(f func(*Cmd) error) Option    { return May(func(c *Cmd) { c.onExit = f }) }
 
-func LogStd() Option {
-	return May(func(c *Cmd) { c.Stderr, c.Stdout = os.Stderr, os.Stdout })
-}
-
 func LineOut(lineRecv func(string)) Option {
-	return May(func(c *Cmd) Undo {
+	return May(func(c *Cmd) Closer {
 		w := LineWriter(lineRecv)
 		c.Stdout, c.Stderr = w, w
-		return eUndo(w.Close)
+		return closerNe(w.Close)
 	})
 }
 
 func LineErr(lineRecv func(string)) Option {
-	return May(func(c *Cmd) Undo {
+	return May(func(c *Cmd) Closer {
 		w := LineWriter(lineRecv)
 		c.Stderr = w
-		return eUndo(w.Close)
+		return closerNe(w.Close)
 	})
 }
 
@@ -105,32 +107,40 @@ func LineIn(lines ...string) Option {
 	return Stdin(strings.NewReader(strings.Join(lines, "\n") + "\n"))
 }
 
-func SlogDebug(prefix string) Option {
+func Slog(prefix string, level slog.Level) Option {
 	le := LineErr(func(s string) { slog.Debug("[stderr] "+s, log.PrefixAttr(prefix)) })
 	lo := LineOut(func(s string) { slog.Debug("[stdout] "+s, log.PrefixAttr(prefix)) })
 	return Options(le, lo)
 }
 
-func May[O IOption](option O) func(*Cmd) (undo Undo, err error) {
-	return func(c *Cmd) (undo Undo, err error) {
+func LogStd() Option {
+	return May(func(c *Cmd) { c.Stderr, c.Stdout = os.Stderr, os.Stdout })
+}
+
+type iOption interface {
+	~func(*Cmd) | ~func(*Cmd) error | ~func(*Cmd) Closer | ~func(*Cmd) (Closer, error)
+}
+
+func May[O iOption](option O) func(*Cmd) (fc Closer, err error) {
+	return func(c *Cmd) (Closer, error) {
 		return apply(option, c)
 	}
 }
 
-type Undo = func()
+type Closer = func()
 
-func eUndo[E any](f func() E) Undo { return func() { _ = f() } }
+func closerNe[E any](f func() E) Closer { return func() { _ = f() } }
 
-func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
-	undo = func() {}
+func apply[MO iOption](option MO, t *Cmd) (fc Closer, err error) {
+	fc = func() {}
 
-	if optApply, ok := any(option).(func(*Cmd) (Undo, error)); ok {
-		undo, err = optApply(t)
+	if optApply, ok := any(option).(func(*Cmd) (Closer, error)); ok {
+		fc, err = optApply(t)
 		return
 	}
 
-	if optApply, ok := any(option).(func(*Cmd) Undo); ok {
-		undo = optApply(t)
+	if optApply, ok := any(option).(func(*Cmd) Closer); ok {
+		fc = optApply(t)
 		return
 	}
 
@@ -146,8 +156,4 @@ func apply[MO IOption](option MO, t *Cmd) (undo Undo, err error) {
 
 	err = fmt.Errorf("[%T]%v: apply error", option, option)
 	return
-}
-
-type IOption interface {
-	~func(*Cmd) | ~func(*Cmd) error | ~func(*Cmd) Undo | ~func(*Cmd) (Undo, error)
 }

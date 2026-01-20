@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
-	"path/filepath"
 	"syscall"
-
-	"github.com/cnk3x/xunlei/pkg/log"
 )
 
 type Cmd struct {
@@ -21,70 +18,49 @@ type Cmd struct {
 type cmd = exec.Cmd
 
 func Run(ctx context.Context, name string, options ...Option) (err error) {
-	defer log.LogDone(ctx, slog.LevelDebug, filepath.Base(name), &err).Defer()
-	ctx, cancel := context.WithCancelCause(ctx)
-
 	c := &Cmd{cmd: exec.CommandContext(ctx, name)}
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
 
-	undo, err := apply(Options(options...), c)
+	closes, err := Options(options...)(c)
 	if err != nil {
-		slog.ErrorContext(ctx, "apply options fail", "err", err)
-		err = fmt.Errorf("apply options fail: %w", err)
-		cancel(err)
+		err = fmt.Errorf("cmdx options: %w", err)
 		return
 	}
-	defer undo()
+	defer closes()
 
 	if c.preStart != nil {
 		if err = c.preStart(c); err != nil {
-			slog.ErrorContext(ctx, "pre start fail", "err", err)
-			err = fmt.Errorf("pre start fail")
-			cancel(err)
+			err = fmt.Errorf("cmdx pre start: %w", err)
 			return
 		}
 	}
 
 	err = func() (err error) {
 		if err = c.Start(); err != nil {
-			slog.ErrorContext(ctx, "start fail", "command", c.String(), "dir", c.Dir, "err", err)
-			err = fmt.Errorf("start fail: %w", err)
-			cancel(err)
+			slog.DebugContext(ctx, "start", "command", c.String(), "dir", c.Dir)
+			err = fmt.Errorf("cmdx start: %w", err)
 			return
 		}
 		slog.DebugContext(ctx, "started", "command", c.String(), "dir", c.Dir, "pid", c.Process.Pid)
 
 		if c.onStarted != nil {
 			if err = c.onStarted(c); err != nil {
-				slog.ErrorContext(ctx, "post_start fail", "err", err)
-				err = fmt.Errorf("post_start fail: %w", err)
-				cancel(err)
+				err = fmt.Errorf("cmdx started: %w", err)
 			}
 		}
 
 		if e := c.Wait(); err == nil && e != nil {
-			err = e
+			err = fmt.Errorf("cmdx wait: %w", e)
 		}
 		return
 	}()
 
 	if c.onExit != nil {
-		if e := c.onExit(c); e != nil {
-			slog.ErrorContext(ctx, "post_exit fail", "err", e)
-			if err == nil {
-				err = e
-			}
+		if e := c.onExit(c); err == nil && e != nil {
+			err = fmt.Errorf("cmdx exit: %w", e)
 		}
 	}
-
-	if err != nil {
-		slog.ErrorContext(ctx, "done", "err", err)
-	} else {
-		slog.DebugContext(ctx, "done")
-	}
-
-	cancel(err)
 	return
 }

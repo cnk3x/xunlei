@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -118,13 +119,33 @@ func VarFlag[T any](fSet *pflag.FlagSet, v T, name, short, usage string, env ...
 		panic(fmt.Errorf("%s type %v(%T) not support", name, x, x))
 	}
 
-	if s != "" {
+	fSet.VisitAll(func(f *pflag.Flag) {
+		if s != "" && f.Name == name {
+			f.DefValue = s
+		}
+	})
+
+	if s != "" && !reDeprecated.MatchString(usage) {
 		fSet.Set(name, s)
 	}
 }
 
+func Changed(name string) bool {
+	return CommandLine.Changed(name)
+}
+
+var reDeprecated = regexp.MustCompile(`\s*\*\*(.+)\*\*\s*`)
+
 func ParseFlag(fSet *pflag.FlagSet) (err error) {
 	fSet.SortFlags = false
+
+	fSet.VisitAll(func(f *pflag.Flag) {
+		if matches := reDeprecated.FindStringSubmatch(f.Usage); len(matches) > 0 {
+			f.Usage = reDeprecated.ReplaceAllString(f.Usage, "")
+			f.Deprecated = matches[1]
+		}
+	})
+
 	return fSet.Parse(os.Args[1:])
 }
 

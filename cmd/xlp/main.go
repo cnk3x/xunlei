@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -74,6 +75,7 @@ func main() {
 		vms.Binds("/lib", "/bin", "/etc/ssl"),
 		vms.Links("/etc/timezone", "/etc/localtime", "/etc/resolv.conf"),
 		vms.Links("/etc/passwd", "/etc/group", "/etc/shadow"),
+		vms.Symlink("lib", filepath.Join(cfg.Root, "lib64")),
 		vms.Basic,
 	)
 

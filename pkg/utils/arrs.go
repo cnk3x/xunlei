@@ -30,15 +30,26 @@ func CompactUniq[Slice ~[]T, T comparable](s Slice, inplace ...bool) Slice {
 	return result[:x]
 }
 
-func Conv[Slice ~[]T, T any](s Slice, cleanFn func(T) T, inplace ...bool) Slice {
-	result := s
+func Conv[Slice ~[]T, T any](s Slice, cleanFn func(T) T, inplace ...bool) (result Slice) {
+	result = s
 	if !cmp.Or(inplace...) {
 		result = make(Slice, len(s))
 	}
 	for i, it := range s {
 		result[i] = cleanFn(it)
 	}
-	return result
+	return
+}
+
+func Replace[Slice ~[]T, T any](s Slice, replaceFn func(T) (T, error)) (result Slice, err error) {
+	result = make(Slice, len(s))
+	for i, it := range s {
+		if result[i], err = replaceFn(it); err != nil {
+			result = result[:0]
+			return
+		}
+	}
+	return
 }
 
 func Map[T, R any](s []T, conv func(T, int) R) []R {

@@ -32,15 +32,15 @@ func BindRs(ctx context.Context, root string, items []BindOptions) (undo Undo, e
 func Bind(ctx context.Context, m BindOptions) (undo Undo, err error) {
 	src := m.Source
 
-	u := utils.MakeUndoPool(&undo, &err)
-	defer u.ErrDefer()
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
 
 	if src, err = filepath.EvalSymlinks(src); err == nil {
 		var dirUndo Undo
 		if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
-			u.Put(dirUndo)
+			bq.Put(dirUndo)
 			if err = syscall.Mount(src, m.Target, "", syscall.MS_BIND, ""); err == nil {
-				u.Put(mkUnmount(ctx, m.Target, "unbind"))
+				bq.Put(mkUnmount(ctx, m.Target, "unbind"))
 			}
 		}
 	}

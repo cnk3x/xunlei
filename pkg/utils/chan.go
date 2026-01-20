@@ -102,10 +102,11 @@ type ft[T any] interface {
 	~func() | ~func() error | ~func(T) | ~func(T) error
 }
 
-func BackExec(exec func()) <-chan struct{} {
+func BackExec(exec func(), onDone ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		defer Run(onDone...)
 		exec()
 	}()
 	return done

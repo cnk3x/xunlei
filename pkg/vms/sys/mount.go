@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
 	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/utils"
@@ -31,14 +32,14 @@ func Mount(ctx context.Context, m MountOptions) (undo Undo, err error) {
 		}
 	}()
 
-	u := utils.MakeUndoPool(&undo, &err)
-	defer u.ErrDefer()
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
 
 	var dirUndo Undo
 	if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
-		u.Put(dirUndo)
+		bq.Put(dirUndo)
 		if err = syscall.Mount(m.Source, m.Target, m.Fstype, m.Flags, m.Data); err == nil {
-			u.Put(mkUnmount(ctx, m.Target, "unmount"))
+			bq.Put(mkUnmount(ctx, m.Target, "unmount"))
 		}
 	}
 
@@ -53,7 +54,11 @@ func mkUnmount(ctx context.Context, target, act string) Undo {
 	return func() {
 		err := syscall.Unmount(target, syscall.MNT_DETACH|syscall.MNT_FORCE)
 		if err != nil {
-			slog.LogAttrs(ctx, slog.LevelWarn, act, slog.String("target", target), slog.String("err", err.Error()))
+			if os.IsNotExist(err) {
+				slog.LogAttrs(ctx, slog.LevelWarn, act, slog.String("target", target), slog.String("err", os.ErrNotExist.Error()))
+			} else {
+				slog.LogAttrs(ctx, slog.LevelWarn, act, slog.String("target", target), slog.String("err", err.Error()))
+			}
 			return
 		}
 		slog.LogAttrs(ctx, slog.LevelDebug, act, slog.String("target", target))

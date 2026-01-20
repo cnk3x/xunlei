@@ -20,8 +20,9 @@ type Middleware = func(http.Handler) http.Handler
 
 // Mux 表示一个HTTP请求多路复用器，支持中间件处理链
 type Mux struct {
-	chi.Router        // 当前多路复用器
-	onShutdown func() // 关闭时执行的回调函数
+	chi.Router                   // 当前多路复用器
+	onShutdown func()            // 关闭时执行的回调函数
+	onStarted  func(addr string) // 监听启动的回调
 }
 
 // Router 接口定义路由的基本操作
@@ -36,65 +37,12 @@ func NewMux() *Mux {
 
 // OnShutDown 设置服务器关闭时的回调函数
 //   - fn: 服务器关闭时执行的函数
-func (mux *Mux) OnShutDown(fn func()) { mux.onShutdown = fn }
+func (mux *Mux) OnShutDown(fn func())           { mux.onShutdown = fn }
+func (mux *Mux) OnStarted(fn func(addr string)) { mux.onStarted = fn }
 
 func (mux *Mux) BasicAuth(user, pwd string) *Mux { mux.Use(BasicAuth(user, pwd)); return mux }
 
 func (mux *Mux) Recoverer() *Mux { mux.Use(Recoverer); return mux }
-
-// // Handle 注册HTTP处理器，根据是否有父级mux来决定注册位置
-// //   - pattern: 请求路径模式
-// //   - handler: HTTP处理器
-// //   - processors: 额外的处理器（中间件）
-// func (mux *Mux) Handle(pattern string, handler http.Handler) {
-// 	slog.Debug("web handle", "pattern", pattern, "handler", handler != nil, "parent", mux.parent != nil, "cur", mux.cur != nil)
-// 	if mux.parent != nil {
-// 		mux.parent.Handle(pattern, applyProcessors(handler, mux.middlewares...))
-// 	} else {
-// 		mux.cur.Handle(pattern, applyProcessors(handler, mux.middlewares...))
-// 	}
-// }
-// // Route 注册一个带有前缀模式和处理器的路由，允许通配符匹配。
-// // 如果前缀不以'*'结尾，则根据情况添加'*'或'/*'以实现路径前缀匹配。
-// //   - prefix: 要匹配的路由前缀（可选尾随'*'）
-// //   - handler: 路由匹配时执行的HTTP处理器
-// func (mux *Mux) Route(prefix string, handler http.Handler) {
-// 	if !strings.HasSuffix(prefix, "*") {
-// 		if strings.HasSuffix(prefix, "/") {
-// 			prefix += "*"
-// 		} else {
-// 			prefix += "/*"
-// 		}
-// 	}
-// 	mux.Handle(prefix, handler)
-// }
-
-// // Get 注册GET请求处理器
-// //   - pattern: GET请求路径模式
-// //   - handler: HTTP处理器
-// //   - processors: 额外的处理器（中间件）
-// func (mux *Mux) Get(pattern string, handler http.Handler) {
-// 	mux.Handle("GET "+pattern, handler)
-// }
-
-// // Post 注册POST请求处理器
-// //   - pattern: POST请求路径模式
-// //   - handler: HTTP处理器
-// //   - processors: 额外的处理器（中间件）
-// func (mux *Mux) Post(pattern string, handler http.Handler) {
-// 	mux.Handle("POST "+pattern, handler)
-// }
-
-// // ServeHTTP 实现http.Handler接口，处理HTTP请求
-// func (mux *Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-// 	if mux.parent != nil {
-// 		mux.parent.ServeHTTP(w, r)
-// 	} else if mux.cur != nil {
-// 		mux.cur.ServeHTTP(w, r)
-// 	} else {
-// 		http.Error(w, "mux is not defined", http.StatusInternalServerError)
-// 	}
-// }
 
 // Run 启动HTTP服务器并监听指定地址
 //   - ctx: 上下文对象
@@ -105,10 +53,24 @@ func (mux *Mux) Run(ctx context.Context, addr string) (err error) {
 	s := &http.Server{
 		Addr: addr, Handler: mux,
 		BaseContext: func(l net.Listener) context.Context {
-			slog.InfoContext(ctx, "web started", "listen", l.Addr().String())
+			if mux.onStarted != nil {
+				mux.onStarted(l.Addr().String())
+			}
 			return ctx
 		},
 	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			s.Shutdown(context.Background())
+		}
+	}()
 
 	if err = s.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 		err = nil
@@ -118,24 +80,6 @@ func (mux *Mux) Run(ctx context.Context, addr string) (err error) {
 		mux.onShutdown()
 	}
 	return
-}
-
-// Start 在后台启动HTTP服务器
-//   - ctx: 上下文对象
-//   - addr: 监听地址
-//
-// 返回完成通道，当服务器停止时该通道会被关闭
-func (mux *Mux) Start(ctx context.Context, addr string) (done <-chan struct{}) {
-	webDone := make(chan struct{})
-	go func() {
-		defer close(webDone)
-		if err := mux.Run(ctx, addr); err != nil {
-			slog.ErrorContext(ctx, "web is done!", "err", err)
-		} else {
-			slog.InfoContext(ctx, "web is done!")
-		}
-	}()
-	return webDone
 }
 
 // Redirect 创建重定向处理器

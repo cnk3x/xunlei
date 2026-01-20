@@ -2,6 +2,7 @@ package xunlei
 
 import (
 	"cmp"
+	"log/slog"
 	"net"
 	"path/filepath"
 
@@ -34,12 +35,6 @@ type Config struct {
 
 // 默认配置端口2345，下载保存文件夹 /xunlei/downloads, 数据文件夹 /xunlei/data
 func ConfigBind(cfg *Config) (err error) {
-	cfg.Port = 2345
-	cfg.Root = utils.Eon(filepath.Abs("./xunlei"))
-	cfg.DirData = utils.Eon(filepath.Abs("./xunlei/data"))
-	cfg.DirDownload = []string{utils.Eon(filepath.Abs("./xunlei/downloads"))}
-	cfg.SpkUrl = spk.DownloadUrl
-
 	flags.Var(&cfg.Port, "dashboard_port", "", "网页访问的端口", "XL_DASHBOARD_PORT", "XL_PORT")
 	flags.Var(&cfg.Ip, "dashboard_ip", "", "网页访问绑定IP，默认绑定所有IP", "XL_DASHBOARD_IP", "XL_IP")
 
@@ -51,50 +46,37 @@ func ConfigBind(cfg *Config) (err error) {
 	flags.Var(&cfg.Uid, "uid", "u", "运行迅雷的用户ID", "XL_UID", "UID")
 	flags.Var(&cfg.Gid, "gid", "g", "运行迅雷的用户组ID", "XL_GID", "GID")
 	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
-	flags.Var(&cfg.Root, "chroot", "r", "主目录", "XL_CHROOT")
+	flags.Var(&cfg.Root, "chroot", "", "已过期 **请使用 --root 替代**")
+	flags.Var(&cfg.Root, "root", "r", "主目录", "XL_ROOT", "XL_CHROOT")
 	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
 	flags.Var(&cfg.SpkForceDownload, "spk_force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
 	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志文件", "XL_LAUNCHER_LOG_FILE")
 	flags.Var(&cfg.Debug, "debug", "", "是否开启调试日志", "XL_DEBUG")
 
-	if err = utils.SeqExec(
-		flags.Parse,
-		checkPath(&cfg.Root, "./xunlei"),
-		checkPath(&cfg.DirData, "./xunlei/data"),
-		checkPaths(&cfg.DirDownload, "./xunlei/downloads"),
-	); err != nil {
+	if err = flags.Parse(); err != nil {
 		return
 	}
+
+	cfg.Port = cmp.Or(cfg.Port, 2345)
 	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)
+
+	if cfg.Root, err = filepath.Abs(cmp.Or(cfg.Root, "xunlei")); err != nil {
+		slog.Error("无法获取绝对路径", "root", cfg.Root, "err", err)
+		return
+	}
+
+	cfg.DirData = cmp.Or(cfg.DirData, filepath.Join(cfg.Root, "data"))
+	if cfg.DirData, err = filepath.Abs(cfg.DirData); err != nil {
+		return
+	}
+
+	if len(cfg.DirDownload) == 0 {
+		cfg.DirDownload = utils.Array(filepath.Join(cfg.Root, "downloads"))
+	}
+
+	if cfg.DirDownload, err = utils.Replace(cfg.DirDownload, filepath.Abs); err != nil {
+		slog.Error("无法获取绝对路径", "dir_download", cfg.DirDownload, "err", err)
+		return
+	}
 	return
-}
-
-// 检查路径，并把传入的路径转换成绝对路径
-func checkPaths(dirs *[]string, defPath string) func() (err error) {
-	return func() (err error) {
-		*dirs = utils.CompactUniq(*dirs)
-		if len(*dirs) == 0 {
-			*dirs = utils.Array(defPath)
-		}
-		for i, dir := range *dirs {
-			if (*dirs)[i], err = filepath.Abs(dir); err != nil {
-				*dirs = (*dirs)[:0]
-				return
-			}
-		}
-		*dirs = utils.CompactUniq(*dirs)
-		return
-	}
-}
-
-// 检查路径，并把传入的路径转换成绝对路径
-func checkPath(path *string, defPath string) func() (err error) {
-	return func() (err error) {
-		p, e := filepath.Abs(cmp.Or(*path, defPath))
-		if err = e; err != nil {
-			return
-		}
-		*path = p
-		return
-	}
 }

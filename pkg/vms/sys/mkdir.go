@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -29,8 +28,8 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 		return
 	}
 
-	u := utils.MakeUndoPool(&undo, &err)
-	defer u.ErrDefer()
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
 
 	vol := cmp.Or(filepath.VolumeName(dir), "/")
 	items := strings.FieldsFunc(strings.TrimPrefix(dir, vol), func(r rune) bool { return r == '/' })
@@ -44,7 +43,7 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 		}
 
 		if ok {
-			u.Put(newRm(ctx, p, utils.Iif(i == len(items)-1, "rmdir", "")))
+			bq.Put(newRm(ctx, p, utils.Iif(i == len(items)-1, "rmdir", "")))
 		}
 	}
 
@@ -54,9 +53,6 @@ func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err er
 func newRm(ctx context.Context, target, act string) func() {
 	return func() {
 		if err := os.Remove(target); act != "" {
-			if errors.Is(err, syscall.ENOTEMPTY) {
-				err = fmt.Errorf("%s: %w", "directory not empty", err)
-			}
 			logIt(ctx, err, true, act, slog.String("target", target))
 		}
 	}

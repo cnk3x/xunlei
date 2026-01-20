@@ -54,7 +54,7 @@ func Links(files ...string) Option {
 	}
 }
 
-func Binds(dirs ...string) func(ro *options) {
+func Binds(dirs ...string) Option {
 	return func(ro *options) {
 		for _, dir := range dirs {
 			mOpts := sys.BindOptions{
@@ -63,5 +63,16 @@ func Binds(dirs ...string) func(ro *options) {
 			}
 			ro.binds = append(ro.binds, mOpts)
 		}
+	}
+}
+
+func Symlink(source, target string) Option {
+	return func(ro *options) {
+		ro.symbols = append(ro.symbols, sys.LinkOptions{
+			Source:   source,
+			Target:   target,
+			Optional: true,
+			DirMode:  0777,
+		})
 	}
 }

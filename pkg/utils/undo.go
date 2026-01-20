@@ -2,34 +2,45 @@ package utils
 
 import "slices"
 
-func MakeUndoPool(undo *func(), autoUndoIfErr *error) (r struct {
+type funcQueue struct {
 	Put      func(undo func())
 	ErrDefer func()
 	Run      func()
-}) {
-	var undos []func()
+}
 
-	r.Run = func() { BackwardCall(undos...) }
+// BackQueue 先进后出的回滚函数队列
+//   - rollback: 这是返回参数，回滚方法。
+//   - autoRunIfErr: 这是传入参数，在 `defer fq.ErrDefer()` 中判断*error不为空则自动执行回滚
+func BackQueue(rollback *func(), autoRunIfErr *error) (q funcQueue) {
+	var funcs []func()
 
-	r.Put = func(undo func()) {
-		if undo != nil {
-			undos = append(undos, undo)
+	q.Run = func() {
+		for _, f := range slices.Backward(funcs) {
+			if f != nil {
+				f()
+			}
 		}
 	}
 
-	r.ErrDefer = func() {
-		if autoUndoIfErr != nil && *autoUndoIfErr != nil {
-			r.Run()
+	q.Put = func(f func()) {
+		if f != nil {
+			funcs = append(funcs, f)
 		}
 	}
 
-	if undo != nil {
-		*undo = r.Run
+	q.ErrDefer = func() {
+		if autoRunIfErr != nil && *autoRunIfErr != nil {
+			q.Run()
+		}
+	}
+
+	if rollback != nil {
+		*rollback = q.Run
 	}
 	return
 }
 
-func Call(fs ...func()) {
+func Run(fs ...func()) {
 	for _, f := range fs {
 		if f != nil {
 			f()
@@ -37,7 +48,7 @@ func Call(fs ...func()) {
 	}
 }
 
-func BackwardCall(fs ...func()) {
+func BackwardRun(fs ...func()) {
 	for _, f := range slices.Backward(fs) {
 		if f != nil {
 			f()

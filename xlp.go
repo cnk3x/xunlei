@@ -3,9 +3,7 @@ package xunlei
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/cgi"
@@ -59,14 +57,14 @@ var (
 
 func Before(cfg Config) func(ctx context.Context) (func(), error) {
 	return func(ctx context.Context) (undo func(), err error) {
-		u := utils.MakeUndoPool(&undo, &err)
-		defer u.ErrDefer()
+		bq := utils.BackQueue(&undo, &err)
+		defer bq.ErrDefer()
 
-		undo, err = mockSyno(ctx, cfg.Root)
-		if err != nil {
+		msUndo, e := mockSyno(ctx, cfg.Root)
+		if err = e; err != nil {
 			return
 		}
-		u.Put(undo)
+		bq.Put(msUndo)
 
 		target := filepath.Join(cfg.Root, DIR_SYNOPKG_PKGDEST)
 		varPath := filepath.Join(cfg.Root, DIR_VAR)
@@ -76,11 +74,11 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 			slog.WarnContext(ctx, "clean dir fail", "path", varPath, "err", e)
 		}
 
-		undo, err = sys.Mkdirs(ctx, append(cfg.DirDownload, target, varPath, dirHome), 0777)
-		if err != nil {
+		mdUndo, e := sys.Mkdirs(ctx, append(cfg.DirDownload, target, varPath, dirHome), 0777)
+		if err = e; err != nil {
 			return
 		}
-		u.Put(undo)
+		bq.Put(mdUndo)
 
 		dest := filepath.Join(cfg.Root, DIR_SYNOPKG_PKGDEST)
 		if err = spk.Download(ctx, cfg.SpkUrl, dest, cfg.SpkForceDownload); err != nil {
@@ -91,32 +89,42 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 			sys.Chown(ctx, utils.Array(varPath), cfg.Uid, cfg.Gid, false)
 			sys.Chown(ctx, utils.Array(cfg.DirData, target), cfg.Uid, cfg.Gid, true)
 		}
+
 		return
 	}
 }
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
-		defer log.LogDone(ctx, slog.LevelInfo, "xlp", &err).Defer()
+		fixPath := func(s string) (rel string, err error) {
+			if rel, err = filepath.Rel(cfg.Root, s); err != nil {
+				return "", err
+			}
+			if strings.HasPrefix(rel, ".") {
+				return "", fmt.Errorf("%s is not a subpath of %s", rel, cfg.Root)
+			}
+			return "/" + rel, nil
+		}
 
-		ctx, cancel := context.WithCancelCause(ctx)
-		defer cancel(fmt.Errorf("done"))
-
-		var dirDownload []string
-		if dirDownload, err = utils.NewRootPath(cfg.Root, cfg.DirDownload...); err != nil {
+		dirDownload := cfg.DirDownload
+		if dirDownload, err = utils.Replace(dirDownload, fixPath); err != nil {
 			return
 		}
 
-		var dirData []string
-		if dirData, err = utils.NewRootPath(cfg.Root, cfg.DirData); err != nil {
+		dirData := cfg.DirData
+		if dirData, err = fixPath(cfg.DirData); err != nil {
 			return
 		}
 
-		envs := mockEnv(dirData[0], strings.Join(dirDownload, ":"))
+		envs := mockEnv(dirData, strings.Join(dirDownload, ":"))
 
-		return cmdx.Run(
-			log.Prefix(ctx, "exec"),
-			FILE_PAN_XUNLEI_CLI,
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
+		go webRun(log.Prefix(ctx, "web"), envs, cfg, cancel)
+
+		ctx = log.Prefix(ctx, "exec")
+		return cmdx.Run(ctx, FILE_PAN_XUNLEI_CLI,
 			cmdx.Flags(
 				"-launcher_listen", "unix://"+SOCK_LAUNCHER_LISTEN,
 				"-pid", FILE_PID,
@@ -129,75 +137,16 @@ func Run(cfg Config) func(ctx context.Context) error {
 			cmdx.LineOut(logPan(ctx, "[stdout] ")),
 			cmdx.PreStart(func(c *cmdx.Cmd) error {
 				ctx := log.Prefix(ctx, "check")
-				s, err := os.Stat(FILE_PAN_XUNLEI_CLI)
-				if err != nil {
-					slog.DebugContext(ctx, "check cli fail", "err", err)
-					return err
-				}
-				slog.DebugContext(ctx, "check cli", "perm", s.Mode().Perm(), "modtime", s.ModTime())
-
-				err = fo.WalkDir(DIR_SYNOPKG_WORK, func(path string, d fs.DirEntry) error {
-					slog.DebugContext(ctx, "check workdir", "file", path)
-					return nil
-				})
-				if err != nil {
-					slog.DebugContext(ctx, "check workdir fail", "err", err)
-					return err
-				}
-
-				err = fo.WalkDir("/lib", func(path string, d fs.DirEntry) error {
-					slog.DebugContext(ctx, "check lib", "file", path)
-					return nil
-				})
-				if err != nil {
-					slog.DebugContext(ctx, "check lib fail", "err", err)
-					return err
-				}
-
-				for _, n := range envs {
-					k, v, _ := strings.Cut(n, "=")
-					slog.DebugContext(ctx, "check env", k, v)
-				}
-
-				ctx, cancel := context.WithTimeout(ctx, time.Second*3)
-				defer cancel()
-				return cmdx.Shell(ctx,
-					"LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI, cmdx.SlogDebug("check"),
-					cmdx.Env(envs), cmdx.Dir(DIR_SYNOPKG_WORK),
-				)
-
-				// cmd := exec.CommandContext(ctx, "sh", "-c", "LD_TRACE_LOADED_OBJECTS=1 "+FILE_PAN_XUNLEI_CLI)
-				// cmd.Stdout = os.Stdout
-				// cmd.Stderr = os.Stderr
-				// cmd.Dir = DIR_SYNOPKG_WORK
-				// cmd.Env = append(cmd.Env, "LD_TRACE_LOADED_OBJECTS=1")
-				// return cmd.Run()
-
-				// return cmdx.Run(ctx,
-				// 	FILE_PAN_XUNLEI_CLI,
-				// 	cmdx.Dir(DIR_SYNOPKG_WORK),
-				// 	cmdx.Env(append(envs, "LD_TRACE_LOADED_OBJECTS=1")),
-				// 	cmdx.LineErr(logPan(ctx, "[test] ")), cmdx.LineOut(logPan(ctx, "[test]* ")),
-				// )
-			}),
-			cmdx.OnStarted(func(c *cmdx.Cmd) error {
-				done := utils.BackExec(func() {
-					if err := webRun(ctx, envs, cfg); err != nil {
-						cancel(err)
-					}
-				})
-				utils.After(done, func() { cancel(fmt.Errorf("web done")) })
+				slog.DebugContext(ctx, "check uid", "uid", os.Geteuid(), "gid", os.Getegid())
 				return nil
 			}),
-			cmdx.OnExit(func(c *cmdx.Cmd) error { return cleanExit(DIR_VAR) }),
+			cmdx.OnExit(func(c *cmdx.Cmd) error { cancel(); return cleanExit(DIR_VAR) }),
 		)
 	}
 }
 
-func webRun(ctx context.Context, env []string, cfg Config) (err error) {
-	ctx = log.Prefix(ctx, "web")
-	defer log.LogDone(ctx, slog.LevelInfo, "web", &err).Defer()
-
+func webRun(ctx context.Context, env []string, cfg Config, onDone func()) {
+	defer onDone()
 	mux := web.NewMux()
 	mux.Recoverer()
 
@@ -228,12 +177,16 @@ func webRun(ctx context.Context, env []string, cfg Config) (err error) {
 	mux.Get("/webman", web.Redirect(CGI_PATH, true))
 	mux.Handle("/webman/login.cgi", web.Blob(fmt.Sprintf(`{"SynoToken":%q,"result":"success","success":true}`, utils.RandText(13)), "application/json", http.StatusOK))
 
-	// mux.Get("/webman/3rdparty/"+SYNOPKG_PKGNAME+"/version", web.Blob(fmt.Sprintf("arch: %s\nversion: \"0.0.1\"\naccept: [\"9.9.9\"]", runtime.GOARCH), `text/vnd.yaml`, 200))
-	return mux.Run(ctx, web.Address(cfg.Ip, cfg.Port))
+	err := mux.Run(ctx, web.Address(cfg.Ip, cfg.Port))
+	if err != nil {
+		slog.WarnContext(ctx, "done", "err", err.Error())
+	} else {
+		slog.InfoContext(ctx, "done")
+	}
 }
 
 func mockEnv(dirData, dirDownload string) []string {
-	ld_lib := os.Getenv("LD_LIBRARY_PATH")
+	// ld_lib := os.Getenv("LD_LIBRARY_PATH")
 	return append(os.Environ(),
 		"SYNOPLATFORM="+SYNO_PLATFORM,
 		"SYNOPKG_PKGNAME="+SYNOPKG_PKGNAME,
@@ -248,25 +201,32 @@ func mockEnv(dirData, dirDownload string) []string {
 		"HOME="+filepath.Join(dirData, ".drive"),
 		"DownloadPATH="+dirDownload,
 		"GIN_MODE=release",
-		"LD_LIBRARY_PATH=/lib"+utils.Iif(ld_lib == "", "", ":")+ld_lib,
+		// "LD_LIBRARY_PATH=/lib"+utils.Iif(ld_lib == "", "", ":")+ld_lib,
 	)
 }
 
 func mockSyno(ctx context.Context, root string) (undo func(), err error) {
-	u1, e1 := fo.WriteFile(ctx,
-		filepath.Join(root, FILE_SYNO_INFO_CONF),
-		fo.Lines(
-			fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
-			fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
-			fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
-		),
-	)
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
 
-	u2, e2 := authenticate_cgi.Save(ctx, filepath.Join(root, FILE_SYNO_AUTHENTICATE_CGI))
-
-	if err = errors.Join(e1, e2); err != nil {
-		utils.Call(u2, u1)
+	u1, e := sys.NewFile(ctx, filepath.Join(root, FILE_SYNO_INFO_CONF), fo.Lines(
+		fmt.Sprintf(`platform_name=%q`, SYNO_PLATFORM),
+		fmt.Sprintf(`synobios=%q`, SYNO_PLATFORM),
+		fmt.Sprintf(`unique=synology_%s_%s`, SYNO_PLATFORM, SYNO_MODEL),
+	))
+	if err = e; err != nil {
+		return
 	}
+	slog.DebugContext(ctx, "file", "path", FILE_SYNO_INFO_CONF)
+	bq.Put(u1)
+
+	u2, e := sys.NewFile(ctx, FILE_SYNO_AUTHENTICATE_CGI, authenticate_cgi.WriteTo)
+	if err = e; err != nil {
+		return
+	}
+	slog.DebugContext(ctx, "file", "path", FILE_SYNO_AUTHENTICATE_CGI)
+	bq.Put(u2)
+
 	return
 }
 
