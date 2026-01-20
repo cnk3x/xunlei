@@ -1,7 +1,6 @@
 package xunlei
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -9,7 +8,6 @@ import (
 	"net/http/cgi"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -96,6 +94,9 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 
 func Run(cfg Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		fixPath := func(s string) (rel string, err error) {
 			if rel, err = filepath.Rel(cfg.Root, s); err != nil {
 				return "", err
@@ -118,12 +119,9 @@ func Run(cfg Config) func(ctx context.Context) error {
 
 		envs := mockEnv(dirData, strings.Join(dirDownload, ":"))
 
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
 		go webRun(log.Prefix(ctx, "web"), envs, cfg, cancel)
 
-		ctx = log.Prefix(ctx, "exec")
+		panCtx := log.Prefix(ctx, "pan")
 		return cmdx.Run(ctx, FILE_PAN_XUNLEI_CLI,
 			cmdx.Flags(
 				"-launcher_listen", "unix://"+SOCK_LAUNCHER_LISTEN,
@@ -133,8 +131,8 @@ func Run(cfg Config) func(ctx context.Context) error {
 			),
 			cmdx.Dir(DIR_SYNOPKG_WORK),
 			cmdx.Env(envs),
-			cmdx.LineErr(logPan(ctx, "[stderr] ")),
-			cmdx.LineOut(logPan(ctx, "[stdout] ")),
+			cmdx.LineErr(func(s string) { slog.DebugContext(panCtx, "[err] "+s) }),
+			cmdx.LineOut(func(s string) { slog.DebugContext(panCtx, "[std] "+s) }),
 			cmdx.PreStart(func(c *cmdx.Cmd) error {
 				ctx := log.Prefix(ctx, "check")
 				slog.DebugContext(ctx, "check uid", "uid", os.Geteuid(), "gid", os.Getegid())
@@ -157,19 +155,19 @@ func webRun(ctx context.Context, env []string, cfg Config, onDone func()) {
 		),
 	)
 
-	c1 := cmdx.LineWriter(logPan(log.Prefix(ctx, "cgi"), "[std] "))
-	defer c1.Close()
+	lErr := cmdx.LineWriter(func(s string) { slog.DebugContext(ctx, "[cgi] [err] "+s) })
+	defer lErr.Close()
 
-	c2 := cmdx.LineWriter(logPan(log.Prefix(ctx, "cgi"), "[log] "))
-	defer c2.Close()
+	lLog := cmdx.LineWriter(func(s string) { slog.DebugContext(ctx, "[cgi] [log] "+s) })
+	defer lLog.Close()
 
 	const CGI_PATH = "/webman/3rdparty/" + SYNOPKG_PKGNAME + "/index.cgi/"
 	mux.With(web.BasicAuth(cfg.DashboardUsername, cfg.DashboardPassword)).Mount(CGI_PATH, &cgi.Handler{
 		Dir:    DIR_SYNOPKG_WORK,
 		Path:   FILE_INDEX_CGI,
 		Env:    env,
-		Stderr: c1,
-		Logger: utils.LogStd(c2),
+		Stderr: lErr,
+		Logger: utils.LogStd(lLog),
 	})
 
 	mux.Get("/", web.Redirect(CGI_PATH, true))
@@ -227,71 +225,6 @@ func mockSyno(ctx context.Context, root string) (undo func(), err error) {
 	slog.DebugContext(ctx, "file", "path", FILE_SYNO_AUTHENTICATE_CGI)
 	bq.Put(u2)
 
-	return
-}
-
-// 2026-01-18T16:27:02.76464281+08:00
-var prefixRe = regexp.MustCompile(`(\d{2,4}[:/-]\d{2}[:/-]\d{2}[0-9 TZ:/.+-]+)\s*(INFO|ERROR|WARNING)?\s*>?\s*`)
-
-func logPan(ctx context.Context, prefix string) func(string) {
-	l := slog.LevelDebug
-	return func(s string) {
-		var t slog.Attr
-		if matches := prefixRe.FindStringSubmatch(s); len(matches) > 0 {
-			l = cmp.Or(log.LevelFromString(matches[2], l), slog.LevelDebug)
-			ts := strings.TrimSpace(matches[1])
-			if d, ok := timeParse(ts); ok {
-				t = slog.Time(slog.TimeKey, d)
-			} else {
-				t = slog.String("pan_time", ts)
-			}
-			s = s[len(matches[0]):]
-		}
-		slog.LogAttrs(ctx, l, prefix+s, t)
-	}
-}
-
-func timeParse(s string) (t time.Time, ok bool) {
-	layouts := []struct {
-		layout   string
-		inLocal  bool
-		addToday bool
-	}{
-		{"15:04:05.00", true, true},
-		{"15:04:05.0", true, true},
-		{"2026/01/16 22:08:13", true, false},
-		{"2006-01-02T15:04:05.999999999-0700", false, false},
-		{"2006-01-02T15:04:05.999999999-07:00", false, false},
-		{"2006-01-02T15:04:05.99999999-07:00", false, false},
-		{"2006-01-02T15:04:05.9999999-07:00", false, false},
-		{"2006-01-02T15:04:05.999999-07:00", false, false},
-		{"2006-01-02T15:04:05.99999-07:00", false, false},
-		{"2006-01-02T15:04:05.9999-07:00", false, false},
-		{"2006-01-02T15:04:05.999-07:00", false, false},
-		{"2006-01-02T15:04:05.99-07:00", false, false},
-		{"2006-01-02T15:04:05.9-07:00", false, false},
-		{"2006-01-02T15:04:05-07:00", false, false},
-		{time.RFC3339Nano, false, false},
-	}
-
-	var err error
-	for _, l := range layouts {
-		if len(l.layout) == len(s) {
-			if l.inLocal {
-				t, err = time.ParseInLocation(l.layout, s, time.Local)
-			} else {
-				t, err = time.Parse(l.layout, s)
-			}
-			if err == nil {
-				if l.addToday {
-					now := time.Now()
-					t = t.AddDate(now.Year(), int(now.Month())-1, now.Day())
-				}
-				ok = true
-				return
-			}
-		}
-	}
 	return
 }
 

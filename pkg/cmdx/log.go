@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-func LineWriter(lineRead func(line string)) io.WriteCloser {
+func LineWriter(lineRead func(s string)) io.WriteCloser {
 	r, w := io.Pipe()
 	go func() {
 		for scan := bufio.NewScanner(r); scan.Scan(); {
