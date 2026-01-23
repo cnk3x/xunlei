@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,66 +9,49 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cnk3x/flags"
 	"github.com/cnk3x/xunlei"
-	"github.com/cnk3x/xunlei/pkg/flags"
 	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/pkg/vms"
 )
 
 var BuildTime string
 
-func init() {
-	flags.SetVersion(xunlei.Version)
-	if BuildTime != "" {
-		if bt, err := time.Parse(time.RFC3339, BuildTime); err == nil {
-			flags.SetBuildTime(bt)
-		}
-	}
-}
-
 func main() {
-	var cfg xunlei.Config
-	if err := xunlei.ConfigBind(&cfg); err != nil {
+	cfg := &xunlei.Config{}
+
+	fSet := flags.NewSet(flags.Version(xunlei.Version), flags.BuildTime(BuildTime))
+	fSet.Struct(cfg)
+	if !fSet.Parse() {
+		os.Exit(1)
+	}
+
+	if err := xunlei.ConfigCheck(cfg); err != nil {
 		slog.Error("exit", "err", err)
 		os.Exit(1)
 	}
 
-	if uid := os.Getuid(); uid != 0 {
-		slog.Error("exit", "err", "must run as root", "uid", uid)
-		os.Exit(1)
+	xunlei.Banner(func(s string) { slog.Info(s) })
+	xunlei.ConfigPrint(cfg, func(s string) { slog.Info("XL_" + s) })
+
+	if vms.RootRequired(cfg.Root) {
+		if uid := os.Getuid(); uid != 0 {
+			slog.Error("exit", "err", "must run as root", "uid", uid)
+			os.Exit(1)
+		}
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	ctx = log.Prefix(ctx, "main")
-	slog.InfoContext(ctx, `_  _ _  _ _  _ _    ____  _`)
-	slog.InfoContext(ctx, ` \/  |  | |\ | |    |___  |`)
-	slog.InfoContext(ctx, `_/\_ |__| | \| |___ |___  |`)
-	slog.InfoContext(ctx, fmt.Sprintf(`daemon version: %s`, xunlei.Version))
-	slog.InfoContext(ctx, fmt.Sprintf(`build time: %s`, flags.GetBuildTime().In(time.Local).Format(time.RFC3339)))
-	slog.InfoContext(ctx, fmt.Sprintf("port: %d", cfg.Port))
-	slog.InfoContext(ctx, fmt.Sprintf("ip: %s", cfg.Ip))
-	slog.InfoContext(ctx, fmt.Sprintf("dashboard username: %s", cfg.DashboardUsername))
-	slog.InfoContext(ctx, fmt.Sprintf("dashboard password: %s", utils.PasswordMask(cfg.DashboardPassword)))
-	for i, dir := range cfg.DirDownload {
-		slog.InfoContext(ctx, fmt.Sprintf("dir download.%d: %s", i+1, dir))
-	}
-	slog.InfoContext(ctx, fmt.Sprintf("dir data: %s", cfg.DirData))
-	slog.InfoContext(ctx, fmt.Sprintf("uid: %d", cfg.Uid))
-	slog.InfoContext(ctx, fmt.Sprintf("gid: %d", cfg.Gid))
-	slog.InfoContext(ctx, fmt.Sprintf("root: %s", cfg.Root))
-	slog.InfoContext(ctx, fmt.Sprintf("spk_url: %s", cfg.SpkUrl))
-	slog.InfoContext(ctx, fmt.Sprintf("spk_force_download: %t", cfg.SpkForceDownload))
-	slog.InfoContext(ctx, fmt.Sprintf("prevent update: %t", cfg.PreventUpdate))
-	slog.InfoContext(ctx, fmt.Sprintf("log: %s", cfg.Log))
-	slog.InfoContext(ctx, fmt.Sprintf("debug: %t", cfg.Debug))
+
+	slog.InfoContext(ctx, "VERSION: "+fSet.Version())
+	slog.InfoContext(ctx, "BUILD_TIME: "+fSet.BuildTime().In(time.Local).Format(time.RFC3339))
+	xunlei.ConfigPrint(cfg, func(s string) { slog.InfoContext(ctx, s) })
 
 	err := vms.Execute(
 		log.Prefix(ctx, "vms"),
-		vms.Before(xunlei.Before(cfg)),
-		vms.Run(xunlei.Run(cfg)),
 		vms.Wait(cfg.Debug),
 		vms.User(cfg.Uid, cfg.Gid),
 		vms.Root(cfg.Root),
@@ -78,6 +60,9 @@ func main() {
 		vms.Links("/etc/passwd", "/etc/group", "/etc/shadow"),
 		vms.Symlink("lib", filepath.Join(cfg.Root, "lib64")),
 		vms.Basic,
+
+		vms.Before(xunlei.Before(cfg)),
+		vms.Run(xunlei.Run(cfg)),
 	)
 
 	if err != nil {

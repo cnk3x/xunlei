@@ -40,7 +40,7 @@ func Execute(ctx context.Context, execOpts ...Option) (err error) {
 		option(&opts)
 	}
 
-	if opts.root != "" && opts.root != "/" {
+	if RootRequired(opts.root) {
 		//mounts
 		unmounts, e := sys.Mounts(ctx, opts.mounts)
 		if err = e; err != nil {
@@ -115,16 +115,16 @@ func chrootRun(ctx context.Context, root string, run func(ctx context.Context) e
 }
 
 func chroot(ctx context.Context, root string) (rollback func(), err error) {
-	slog.InfoContext(ctx, "chroot start", "root", root)
-	defer slog.InfoContext(ctx, "chroot done")
-
 	bq := utils.BackQueue(&rollback, &err)
 	defer bq.ErrDefer()
 
-	bq.Put(func() { slog.InfoContext(ctx, "chroot rollback done") })
-	defer bq.Put(func() { slog.InfoContext(ctx, "chroot rollback start") })
+	if RootRequired(root) {
+		slog.InfoContext(ctx, "chroot start", "root", root)
+		defer slog.InfoContext(ctx, "chroot done")
 
-	if root != "" && root != "/" {
+		bq.Put(func() { slog.InfoContext(ctx, "chroot rollback done") })
+		defer bq.Put(func() { slog.InfoContext(ctx, "chroot rollback start") })
+
 		if err = errcheck(ctx, slog.LevelDebug, "check root", checkUid("chroot")); err != nil {
 			return
 		}
@@ -205,3 +205,5 @@ func checkUid(name string) (err error) {
 	}
 	return
 }
+
+func RootRequired(root string) bool { return root != "" && root != "/" }

@@ -22,7 +22,7 @@ import (
 	"github.com/cnk3x/xunlei/spk"
 )
 
-const Version = "4.0.0"
+const Version = "4.0.0-beta1"
 
 const (
 	SYNOPKG_DSM_VERSION_MAJOR = "7"              //系统的主版本
@@ -54,7 +54,7 @@ var (
 )
 
 // 还在宿主机环境操作
-func Before(cfg Config) func(ctx context.Context) (func(), error) {
+func Before(cfg *Config) func(ctx context.Context) (func(), error) {
 	return func(ctx context.Context) (undo func(), err error) {
 		bq := utils.BackQueue(&undo, &err)
 		defer bq.ErrDefer()
@@ -94,7 +94,7 @@ func Before(cfg Config) func(ctx context.Context) (func(), error) {
 }
 
 // 已chroot的操作
-func Run(cfg Config) func(ctx context.Context) error {
+func Run(cfg *Config) func(ctx context.Context) error {
 	return func(ctx context.Context) (err error) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -144,12 +144,12 @@ func Run(cfg Config) func(ctx context.Context) error {
 				slog.InfoContext(ctx, "started", "cmdline", c.String(), "dir", c.Dir, "pid", c.Process.Pid)
 				return nil
 			}),
-			cmdx.OnExit(func(c *cmdx.Cmd) error { cancel(); return cleanExit(DIR_VAR) }),
+			cmdx.OnExit(func(c *cmdx.Cmd) error { cancel(); cleanExit(DIR_VAR); return nil }),
 		)
 	}
 }
 
-func webRun(ctx context.Context, env []string, cfg Config, onDone func()) {
+func webRun(ctx context.Context, env []string, cfg *Config, onDone func()) {
 	defer onDone()
 	mux := web.NewMux()
 	mux.Recoverer()
@@ -182,7 +182,7 @@ func webRun(ctx context.Context, env []string, cfg Config, onDone func()) {
 	mux.Get("/webman", web.Redirect(CGI_PATH, true))
 	mux.Handle("/webman/login.cgi", web.Blob(fmt.Sprintf(`{"SynoToken":%q,"result":"success","success":true}`, utils.RandText(13)), "application/json", http.StatusOK))
 
-	err := mux.Run(ctx, web.Address(cfg.Ip, cfg.Port))
+	err := mux.Run(ctx, web.Address(cfg.DashboardIp, cfg.DashboardPort))
 	if err != nil {
 		slog.WarnContext(ctx, "done", "err", err.Error())
 	} else {
@@ -233,25 +233,8 @@ func mockSyno(ctx context.Context, root string) (undo func(), err error) {
 	return
 }
 
-func cleanExit(dir string) (err error) {
-	err = fo.OpenRead(dir, func(f *os.File) (err error) {
-		var entries []os.DirEntry
-		if entries, err = f.ReadDir(-1); err != nil {
-			return
-		}
-		for _, entry := range entries {
-			if name := entry.Name(); strings.HasSuffix(name, ".sock") || strings.HasSuffix(name, ".pid") {
-				if err = os.Remove(filepath.Join(dir, name)); err != nil {
-					return
-				}
-			}
-		}
-		return
-	})
-
-	if os.IsNotExist(err) {
-		err = nil
+func cleanExit(dir string) {
+	for name := range fo.FileSeq(dir, fo.MatchExt(".sock", ".pid")) {
+		os.Remove(filepath.Join(dir, name))
 	}
-
-	return
 }

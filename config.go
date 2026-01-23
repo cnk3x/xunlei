@@ -2,75 +2,53 @@ package xunlei
 
 import (
 	"cmp"
+	"fmt"
 	"log/slog"
 	"net"
 	"path/filepath"
 	"strings"
 
-	"github.com/cnk3x/xunlei/pkg/flags"
-	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/utils"
 	"github.com/cnk3x/xunlei/spk"
 )
 
-// Config 配置
-type Config struct {
-	Port uint16 //网页访问的端口
-	Ip   net.IP //网页访问绑定IP，默认绑定所有IP
-
-	DashboardUsername string //网页访问的用户名
-	DashboardPassword string //网页访问的密码
-
-	Root             string   //主目录
-	DirDownload      []string //下载保存文件夹，可多次指定，需确保有权限访问
-	DirData          string   //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
-	Uid              int      //运行迅雷的用户ID
-	Gid              int      //运行迅雷的用户组ID
-	PreventUpdate    bool     //阻止更新
-	SpkUrl           string   //下载链接
-	SpkForceDownload bool     //是否强制下载
-
-	LauncherLogFile string //迅雷启动器日志文件
-
-	Debug bool   //是否开启调试日志
-	Log   string //日志等级 [debug,info/information,warn/warning,error/err]
-
-	chroot string //过期暂留
+func Banner(fPrint func(string)) {
+	fPrint(`_  _ _  _ _  _ _    ____  _`)
+	fPrint(` \/  |  | |\ | |    |___  |`)
+	fPrint(`_/\_ |__| | \| |___ |___  |`)
 }
 
-// 默认配置端口2345，下载保存文件夹 /xunlei/downloads, 数据文件夹 /xunlei/data
-func ConfigBind(cfg *Config) (err error) {
-	cfg.Log = "info"
+// Config 配置
+type Config struct {
+	//dashboard
+	DashboardIp       net.IP `usage:"网页访问绑定IP，默认绑定所有IP" env:"XL_DASHBOARD_IP"`
+	DashboardPort     uint16 `usage:"网页访问的端口" env:"XL_DASHBOARD_PORT"`
+	DashboardUsername string `usage:"网页访问的用户名" env:"XL_DASHBOARD_USERNAME"` //网页访问的用户名
+	DashboardPassword string `usage:"网页访问的密码" env:"XL_DASHBOARD_PASSWORD"`  //网页访问的密码
 
-	flags.Var(&cfg.Port, "dashboard_port", "", "网页访问的端口", "XL_DASHBOARD_PORT", "XL_PORT")
-	flags.Var(&cfg.Ip, "dashboard_ip", "", "网页访问绑定IP，默认绑定所有IP", "XL_DASHBOARD_IP", "XL_IP")
+	//jail 模式
+	Root        string   `flag:"r" usage:"主目录" env:"XL_ROOT"`
+	DirDownload []string `flag:"d" usage:"下载保存文件夹，可多次指定，需确保有权限访问" env:"XL_DIR_DOWNLOAD"`
+	DirData     string   `flag:"D" usage:"程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息" env:"XL_DIR_DATA"` //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
+	Uid         int      `flag:"u" usage:"运行核心的UID" env:"XL_UID"`
+	Gid         int      `flag:"g" usage:"运行核心的GID" env:"XL_GID"`
 
-	flags.Var(&cfg.DashboardUsername, "dashboard_username", "", "网页访问的用户名", "XL_DASHBOARD_USERNAME", "XL_BA_USER")
-	flags.Var(&cfg.DashboardPassword, "dashboard_password", "", "网页访问的密码", "XL_DASHBOARD_PASSWORD", "XL_BA_PASSWORD")
+	//核心设置
+	SpkUrl           string `usage:"下载链接" env:"XL_SPK"`
+	SpkForceDownload bool   `usage:"是否强制下载" env:"XL_SPK_FORCE_DOWNLOAD"`
+	LauncherLogFile  string `usage:"迅雷启动器日志文件" env:"XL_LAUNCHER_LOG_FILE"`
+	PreventUpdate    bool   `usage:"阻止更新" env:"XL_PREVENT_UPDATE"`
 
-	flags.Var(&cfg.DirDownload, "dir_download", "d", "下载保存文件夹，可多次指定，需确保有权限访问", "XL_DIR_DOWNLOAD")
-	flags.Var(&cfg.DirData, "dir_data", "D", "程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息", "XL_DIR_DATA")
-	flags.Var(&cfg.Uid, "uid", "u", "运行迅雷的用户ID", "XL_UID", "UID")
-	flags.Var(&cfg.Gid, "gid", "g", "运行迅雷的用户组ID", "XL_GID", "GID")
-	flags.Var(&cfg.PreventUpdate, "prevent_update", "", "阻止更新", "XL_PREVENT_UPDATE")
-	flags.Var(&cfg.Root, "root", "r", "主目录", "XL_ROOT", "XL_CHROOT")
-	flags.Var(&cfg.SpkUrl, "spk", "", "SPK 下载链接", "XL_SPK")
-	flags.Var(&cfg.SpkForceDownload, "spk_force_download", "F", "强制下载", "XL_SPK_FORCE_DOWNLOAD")
-	flags.Var(&cfg.LauncherLogFile, "launcher_log_file", "", "迅雷启动器日志文件", "XL_LAUNCHER_LOG_FILE")
-	flags.Var(&cfg.Debug, "debug", "", "调试模式,调试模式下，失败也不会自动退出,在此模式行，日志等级自动调整为`debug`", "XL_DEBUG")
-	flags.Var(&cfg.Log, "log", "", "日志等级, 可选 debug,info/information,warn/warning,error/err", "XL_LOG")
-	flags.Var(&cfg.chroot, "chroot", "", "已过期 **请使用 --root/-r 替代**")
+	//全局设置
+	Debug bool   `usage:"调试模式，调试模式下，失败也不会自动退出，以便于追踪错误，在此模式行，日志等级自动调整为'debug'" env:"XL_DEBUG"`
+	Log   string `usage:"日志等级，可选 debug，info，warn，error" env:"XL_LOG"`
+}
 
-	if err = flags.Parse(); err != nil {
-		return
-	}
-
-	log.ForDefault(utils.Iif(cfg.Debug, "debug", cfg.Log), false)
-
-	cfg.Port = cmp.Or(cfg.Port, 2345)
+func ConfigCheck(cfg *Config) (err error) {
+	cfg.DashboardPort = cmp.Or(cfg.DashboardPort, 2345)
 	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)
 
-	if cfg.Root, err = filepath.Abs(cmp.Or(cfg.Root, cfg.chroot, "xunlei")); err != nil {
+	if cfg.Root, err = filepath.Abs(cmp.Or(cfg.Root, "xunlei")); err != nil {
 		slog.Error("无法获取绝对路径", "root", cfg.Root, "err", err)
 		return
 	}
@@ -98,5 +76,31 @@ func ConfigBind(cfg *Config) (err error) {
 		slog.Error("无法获取绝对路径", "dir_download", cfg.DirDownload, "err", err)
 		return
 	}
+	return
+}
+
+func ConfigPrint(cfg *Config, fPrint func(string)) (cline []string) {
+	fPrintf := func(format string, args ...any) {
+		fPrint(fmt.Sprintf(format, args...))
+	}
+	// fPrintf("version: %s", cfg.FlagVersion)
+	// fPrintf("buildTime: %s", cfg.FlagBuildTime.In(time.Local).Format(time.RFC3339))
+
+	fPrintf("DASHBOARD_IP: %s", cfg.DashboardIp)
+	fPrintf("DASHBOARD_PORT: %d", cfg.DashboardPort)
+	fPrintf("DASHBOARD_USERNAME: %s", cfg.DashboardUsername)
+	fPrintf("DASHBOARD_PASSWORD: %s", utils.PasswordMask(cfg.DashboardPassword))
+	for i, dir := range cfg.DirDownload {
+		fPrintf("DIR_DOWNLOAD[%d]: %s", i+1, dir)
+	}
+	fPrintf("DIR_DATA: %s", cfg.DirData)
+	fPrintf("UID: %d", cfg.Uid)
+	fPrintf("UID: %d", cfg.Gid)
+	fPrintf("ROOT: %s", cfg.Root)
+	fPrintf("SPK: %s", cfg.SpkUrl)
+	fPrintf("SPK_FORCE_DOWNLOAD: %t", cfg.SpkForceDownload)
+	fPrintf("PREVENT_UPDATE: %t", cfg.PreventUpdate)
+	fPrintf("LOG: %s", cfg.Log)
+	fPrintf("DEBUG: %t", cfg.Debug)
 	return
 }

@@ -9,7 +9,7 @@ DProxy := --build-arg http_proxy=$(http_proxy) --build-arg https_proxy=$(https_p
 DBuild := docker buildx build
 DPush := $(DBuild) --push --platform linux/amd64,linux/arm64
 
-VERSION := "$(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')beta"
+VERSION := $(shell cat xlp.go | grep "const Version =" | head -n1 | grep -Eo '"[^"]+"' | sed 's/"//g')
 
 showTag::
 	@echo version is $(VERSION)
