@@ -10,30 +10,22 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
-
-	"github.com/cnk3x/xunlei/pkg/fo"
-	"github.com/cnk3x/xunlei/pkg/utils"
-	"github.com/cnk3x/xunlei/pkg/vms/sys"
-)
-
-var DownloadUrl = utils.Iif(runtime.GOARCH == "amd64",
-	"https://down.sandai.net/nas/nasxunlei-DSM7-x86_64.spk",
-	"https://down.sandai.net/nas/nasxunlei-DSM7-armv8.spk",
 )
 
 // 检查并下载, 如果 force，忽略检查直接下载
 func Download(ctx context.Context, spkUrl string, dir string, force bool) (err error) {
-	if !force && allExists(ctx, dir) {
-		slog.InfoContext(ctx, "check spk all spk file exists")
+	if !force && allExists(dir) {
+		slog.Info("check spk all spk file exists")
 		return
 	}
 
 	switch {
-	case utils.HasPrefix(spkUrl, "file://", true):
+	case StartWith(spkUrl, "file://"):
 		err = download_file(ctx, spkUrl, dir)
-	case utils.HasPrefix(spkUrl, "http://", true) || utils.HasPrefix(spkUrl, "https://", true):
+	case StartWith(spkUrl, "http://", "https://"):
 		err = download_http(ctx, spkUrl, dir)
 	default:
 		err = fmt.Errorf("spk url is not support: %s", spkUrl)
@@ -43,7 +35,7 @@ func Download(ctx context.Context, spkUrl string, dir string, force bool) (err e
 
 func download_file(ctx context.Context, spkUrl string, dir string) (err error) {
 	spkUrl = strings.TrimPrefix(spkUrl, "file://")
-	slog.InfoContext(ctx, "download spk file", "url", spkUrl)
+	slog.Info("download spk file", "url", spkUrl)
 	f, e := os.Open(spkUrl)
 	if err = e; err != nil {
 		return
@@ -55,7 +47,7 @@ func download_file(ctx context.Context, spkUrl string, dir string) (err error) {
 }
 
 func download_http(ctx context.Context, spkUrl string, dir string) (err error) {
-	slog.InfoContext(ctx, "download spk file", "url", spkUrl)
+	slog.Info("download spk file", "url", spkUrl)
 	var req *http.Request
 	if req, err = http.NewRequestWithContext(ctx, http.MethodGet, spkUrl, nil); err != nil {
 		return
@@ -91,7 +83,7 @@ func download_http(ctx context.Context, spkUrl string, dir string) (err error) {
 	return
 }
 
-func allExists(ctx context.Context, dir string) bool {
+func allExists(dir string) bool {
 	files := []string{
 		filepath.Join(dir, "bin/bin/version"),
 		filepath.Join(dir, "bin/bin/xunlei-pan-cli-launcher.{arch}"),
@@ -99,22 +91,28 @@ func allExists(ctx context.Context, dir string) bool {
 		filepath.Join(dir, "ui/index.cgi"),
 	}
 
-	version := fo.Cat(files[0], true)
+	d, _ := os.ReadFile(files[0])
+	version := strings.TrimSpace(string(d))
 	if version == "" {
-		slog.DebugContext(ctx, "check spk fail, version not found")
+		slog.Debug("check spk fail, version not found")
 		return false
 	}
-	slog.DebugContext(ctx, "check spk", "version", version)
+	slog.Debug("check spk", "version", version)
 
 	repl := strings.NewReplacer("{arch}", runtime.GOARCH, "{version}", version)
 	for _, f := range files[1:] {
 		f = repl.Replace(f)
 		stat, err := os.Stat(f)
 		if err != nil || !stat.Mode().IsRegular() {
-			slog.DebugContext(ctx, "check spk fail", "file", f, "err", err)
+			slog.Debug("check spk fail", "file", f, "err", err)
 			return false
 		}
-		slog.DebugContext(ctx, "check spk", "perm", sys.Perm2s(stat.Mode()), "size", utils.HumanBytes(stat.Size()), "modtime", stat.ModTime(), "file", f)
+		slog.Debug("check spk", "perm", perm2s(stat.Mode()), "modtime", stat.ModTime(), "file", f)
 	}
 	return true
+}
+
+func perm2s(perm os.FileMode) string {
+	// return fmt.Sprintf("%s(0%s)", perm.Perm().String(), strconv.FormatInt(int64(perm.Perm()), 8))
+	return "0" + strconv.FormatInt(int64(perm.Perm()), 8)
 }

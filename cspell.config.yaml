@@ -44,6 +44,7 @@ words:
   - NOSUID
   - nsynobios
   - oldname
+  - pgid
   - PKGDEST
   - PKGNAME
   - PKGROOT
@@ -54,6 +55,7 @@ words:
   - rootfs
   - shenzhen
   - softprops
+  - sshpass
   - succ
   - SYNO
   - synobios

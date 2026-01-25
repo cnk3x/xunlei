@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cnk3x/xunlei/pkg/log"
-	"github.com/cnk3x/xunlei/pkg/vms/sys"
 	"github.com/ulikunitz/xz"
 )
 
@@ -53,7 +51,17 @@ func Extract(ctx context.Context, src io.Reader, dstDir string) (err error) {
 					return
 				}()
 
-				slog.Log(ctx, log.ErrDebug(err), "extract package", "perm", sys.Perm2s(perm), "target_dir", dstDir, "name", h.Name, "err", err)
+				msg := "extract package"
+				attrs := []slog.Attr{
+					slog.String("perm", perm2s(perm)),
+					slog.String("target_dir", dstDir),
+					slog.String("name", h.Name),
+				}
+				if err != nil {
+					slog.LogAttrs(ctx, slog.LevelWarn, msg, append(attrs, slog.String("err", err.Error()))...)
+				} else {
+					slog.LogAttrs(ctx, slog.LevelDebug, msg, attrs...)
+				}
 				return
 			}, Xz), io.EOF)
 		}
@@ -99,3 +107,21 @@ func Xz(src io.Reader) (io.ReadCloser, error) {
 type Decoder func(io.Reader) (io.ReadCloser, error)
 
 type WalkFunc func(r io.Reader, h *tar.Header) (err error)
+
+func HasExt(name string, exts ...string) bool {
+	for _, ext := range exts {
+		if len(name) >= len(ext) && strings.EqualFold(name[len(name)-len(ext):], ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func StartWith(name string, prefixes ...string) bool {
+	for _, prefix := range prefixes {
+		if len(name) >= len(prefix) && strings.EqualFold(name[:len(prefix)], prefix) {
+			return true
+		}
+	}
+	return false
+}

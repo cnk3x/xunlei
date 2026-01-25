@@ -39,3 +39,7 @@ debian:: amd64
 
 test:: amd64
 	wsl -d debian -- sshpass -p wan scp ./artifacts/xlp-amd64 cnk3x@192.168.99.9:~/apps/xunlei/xlp
+
+xll::
+	cd xll; GOOS=linux GOARCH=amd64 $(GBuild) -v -o ../artifacts/xll
+	sshpass -p wan scp artifacts/xll cnk3x@192.168.99.9:~/apps/xll/xll

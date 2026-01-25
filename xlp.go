@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"syscall"
 
 	"github.com/cnk3x/xunlei/pkg/log"
 	"github.com/cnk3x/xunlei/pkg/vms"
@@ -140,25 +139,4 @@ func mockEnv(dirData, dirDownload string) []string {
 		"GIN_MODE=release",
 		// "LD_LIBRARY_PATH=/lib"+utils.Iif(ld_lib == "", "", ":")+ld_lib,
 	)
-}
-
-// NewnsRun 在unshare后执行 fn，执行完成后恢复
-//
-// 参数:
-//   - ctx: 上下文
-//   - fn: 要在新命名空间中执行的函数
-func NewnsRun(ctx context.Context, fn func()) {
-	// 创建新的挂载命名空间、PID命名空间和UTS命名空间
-	syscall.Unshare(syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWUTS)
-	// 设置根目录为私有挂载，防止影响父命名空间
-	syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
-	// 挂载新的proc文件系统
-	syscall.Mount("none", "/proc", "proc", syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV, "")
-	// 执行指定函数
-	fn()
-	// 清理操作：卸载挂载的proc文件系统
-	syscall.Unmount("/proc", syscall.MNT_DETACH)
-	// 注意：由于CLONE_NEWPID的存在，子进程退出后会自动清理PID命名空间
-	// 挂载命名空间会在进程结束时自动恢复到原始状态
-	// 但由于我们设置了MS_PRIVATE，所以不会影响原始挂载树
 }

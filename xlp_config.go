@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/cnk3x/xunlei/pkg/utils"
-	"github.com/cnk3x/xunlei/spk"
 )
 
 func Banner(fPrint func(string)) {
@@ -55,7 +54,7 @@ func ConfigCheck(cfg *Config) (err error) {
 
 	//设置默认值
 	cfg.DashboardPort = cmp.Or(cfg.DashboardPort, 2345) //端口默认2345
-	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)    //下载链接
+	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, SPK_URL)            //下载链接
 
 	cfg.Root = cmp.Or(cfg.Root, "xunlei")                              //根目录默认 ./xunlei
 	cfg.DirData = cmp.Or(cfg.DirData, filepath.Join(cfg.Root, "data")) //数据默认 ${root}/data
