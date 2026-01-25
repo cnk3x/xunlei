@@ -1,4 +1,4 @@
-TARGET := ../../embed/authenticate_cgi/authenticate_cgi_linux_
+TARGET := ../../embed/authenticate_cgi/authenticate_cgi_go_linux_
 BUILD_S := CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags '-s -w' -o $(TARGET)
 
 build::

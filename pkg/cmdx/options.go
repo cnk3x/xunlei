@@ -78,6 +78,13 @@ func Flags(args ...string) Option {
 	return Args(selectedArgs...)
 }
 
+func ReplaceArgs(replace func(args []string) []string) Option {
+	return func(c *Cmd) (Closer, error) {
+		c.Args = replace(c.Args)
+		return nil, nil
+	}
+}
+
 func Dir(dir string) Option               { return May(func(c *Cmd) { c.Dir = dir }) }
 func Env(env []string) Option             { return May(func(c *Cmd) { c.Env = env }) }
 func Stderr(w io.Writer) Option           { return May(func(c *Cmd) { c.Stderr = w }) }
@@ -85,7 +92,7 @@ func Stdout(w io.Writer) Option           { return May(func(c *Cmd) { c.Stdout =
 func Stdin(r io.Reader) Option            { return May(func(c *Cmd) { c.Stdin = r }) }
 func PreStart(f func(*Cmd) error) Option  { return May(func(c *Cmd) { c.preStart = f }) }
 func OnStarted(f func(*Cmd) error) Option { return May(func(c *Cmd) { c.onStarted = f }) }
-func OnExit(f func(*Cmd) error) Option    { return May(func(c *Cmd) { c.onExit = f }) }
+func Defer(f func(*Cmd) error) Option     { return May(func(c *Cmd) { c.onExit = f }) }
 
 func LineOut(lineRecv func(string)) Option {
 	return May(func(c *Cmd) Closer {

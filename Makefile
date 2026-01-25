@@ -36,3 +36,6 @@ ubuntu:: amd64
 
 debian:: amd64
 	$(DBuild) --load -t $(NAME):$(VERSION)-debian -f debian.Dockerfile .
+
+test:: amd64
+	wsl -d debian -- sshpass -p wan scp ./artifacts/xlp-amd64 cnk3x@192.168.99.9:~/apps/xunlei/xlp

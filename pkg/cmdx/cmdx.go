@@ -11,6 +11,7 @@ import (
 
 type Cmd struct {
 	*cmd
+	ctx       context.Context
 	preStart  func(*Cmd) error
 	onStarted func(*Cmd) error
 	onExit    func(*Cmd) error
@@ -18,10 +19,20 @@ type Cmd struct {
 
 type cmd = exec.Cmd
 
+func (c *Cmd) Context() context.Context { return c.ctx }
+
 func Run(ctx context.Context, name string, options ...Option) (err error) {
-	c := &Cmd{cmd: exec.CommandContext(ctx, name)}
+	c := &Cmd{ctx: ctx, cmd: exec.CommandContext(ctx, name)}
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	c.Cancel = func() error { return syscall.Kill(-c.Process.Pid, syscall.SIGKILL) }
+
+	defer func() {
+		if c.onExit != nil {
+			if e := c.onExit(c); err == nil && e != nil {
+				err = e
+			}
+		}
+	}()
 
 	clean, err := Options(options...)(c)
 	if err != nil {
@@ -61,11 +72,6 @@ func Run(ctx context.Context, name string, options ...Option) (err error) {
 		return
 	}()
 
-	if c.onExit != nil {
-		if e := c.onExit(c); err == nil && e != nil {
-			err = e
-		}
-	}
 	return
 }
 

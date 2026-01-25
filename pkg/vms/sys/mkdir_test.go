@@ -10,21 +10,21 @@ import (
 
 func TestMkdir(t *testing.T) {
 	var err error
-	os.MkdirAll("test_data/EEXIST", 0777)
+	os.MkdirAll("test_data/EEXIST", 0o777)
 
-	err = os.Mkdir("test_data/EEXIST", 0777) //存在 EEXIST
+	err = os.Mkdir("test_data/EEXIST", 0o777) //存在 EEXIST
 	printErr(t, err)
-	err = os.Mkdir("test_data/FEXIST", 0777) //路径存在, 且非文件夹, EEXIST
+	err = os.Mkdir("test_data/FEXIST", 0o777) //路径存在, 且非文件夹, EEXIST
 	printErr(t, err)
-	err = os.Mkdir("test_data/ENOENT/1", 0777) //上级路径不存在 ENOENT
+	err = os.Mkdir("test_data/ENOENT/1", 0o777) //上级路径不存在 ENOENT
 	printErr(t, err)
-	err = os.Mkdir("test_data/FEXIST/1", 0777) //上级路径存在, 且非文件夹, ENOTDIR
+	err = os.Mkdir("test_data/FEXIST/1", 0o777) //上级路径存在, 且非文件夹, ENOTDIR
 	printErr(t, err)
-	err = os.Mkdir("test_data/n1", 0777) //路径存在, 为软链接，软链接目标丢失 EEXIST
+	err = os.Mkdir("test_data/n1", 0o777) //路径存在, 为软链接，软链接目标丢失 EEXIST
 	printErr(t, err)
-	err = os.Mkdir("test_data/n2", 0777) //路径存在, 为软链接，软链接目标存在 EEXIST
+	err = os.Mkdir("test_data/n2", 0o777) //路径存在, 为软链接，软链接目标存在 EEXIST
 	printErr(t, err)
-	err = os.Mkdir("test_data/n3", 0777) //路径存在, 为软链接，软链接目标存在,且非文件夹 EEXIST
+	err = os.Mkdir("test_data/n3", 0o777) //路径存在, 为软链接，软链接目标存在,且非文件夹 EEXIST
 	printErr(t, err)
 
 	l1, _ := os.Readlink("test_data/n1")

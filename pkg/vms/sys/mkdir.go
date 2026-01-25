@@ -1,15 +1,12 @@
 package sys
 
 import (
-	"cmp"
 	"context"
-	"errors"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
-	"syscall"
+	"slices"
 
 	"github.com/cnk3x/xunlei/pkg/utils"
 )
@@ -22,57 +19,60 @@ func Mkdirs(ctx context.Context, dirs []string, perm fs.FileMode) (undo Undo, er
 	)
 }
 
+func MkdirsTask(ctx context.Context, dirs []string, perm fs.FileMode) func() (undo Undo, err error) {
+	return func() (undo Undo, err error) { return Mkdirs(ctx, dirs, perm) }
+}
+
+func MkdirTask(ctx context.Context, dir string, perm fs.FileMode) func() (undo Undo, err error) {
+	return func() (undo Undo, err error) { return Mkdir(ctx, dir, perm) }
+}
+
 // 脱了裤子放个屁，为了能够方便回滚
-func Mkdir(ctx context.Context, dir string, perm fs.FileMode) (undo Undo, err error) {
+//   - 同 [os.MkdirAll] 创建路径中所有不存在的文件夹
+//   - 不同的是，记录了创建的文件夹，并允许回滚
+//   - 创建失败时，会自动回滚已创建过的上级文件夹
+func Mkdir(ctx context.Context, dir string, perm fs.FileMode, logDisabled ...bool) (undo Undo, err error) {
+	bq := utils.BackQueue(&undo, &err)
+	defer bq.ErrDefer()
+
 	if dir, err = filepath.Abs(dir); err != nil {
 		return
 	}
 
-	bq := utils.BackQueue(&undo, &err)
-	defer bq.ErrDefer()
+	logIt := slog.DebugContext
+	if len(logDisabled) > 0 && logDisabled[0] {
+		logIt = func(ctx context.Context, msg string, args ...any) {}
+	}
 
-	vol := cmp.Or(filepath.VolumeName(dir), "/")
-	items := strings.FieldsFunc(strings.TrimPrefix(dir, vol), func(r rune) bool { return r == '/' })
-
-	var ok bool
-	for i := range items {
-		p := filepath.Join(vol, filepath.Join(items[:i+1]...))
-		if ok, err = mkdir(p, perm); err != nil {
-			slog.WarnContext(ctx, "mkdir fail", "dir", p, "err", err)
-			break
+	for _, cur := range allNotExists(dir) {
+		if err = os.Mkdir(cur, perm); err != nil {
+			slog.DebugContext(ctx, "mkdir fail", "dir", cur, "err", Errno(err))
+			return
 		}
+		logIt(ctx, "mkdir", "perm", Perm2s(perm), "dir", dir)
+		bq.Put(newRm(ctx, dir, "rmdir"))
+	}
 
-		if ok {
-			bq.Put(newRm(ctx, p, utils.Iif(i == len(items)-1, "rmdir", "")))
-		}
+	if err != nil {
+		slog.DebugContext(ctx, "mkdir fail", "dir", dir, "err", Errno(err))
 	}
 
 	return
 }
 
-func newRm(ctx context.Context, target, act string) func() {
-	return func() {
-		if err := os.Remove(target); act != "" {
-			logIt(ctx, err, true, act, slog.String("target", target))
+// notice: dir must abs
+func allNotExists(dir string) (notExistDirs []string) {
+	for p, i := dir, 0; i < 100; i++ {
+		if _, e := os.Stat(p); e == nil {
+			break
 		}
-	}
-}
-
-func mkdir(dir string, perm fs.FileMode) (ok bool, err error) {
-	if err = os.Mkdir(dir, perm); err == nil { //创建成功
-		ok = true
-		return
-	}
-
-	if errors.Is(err, syscall.EEXIST) {
-		switch lstat, _ := os.Lstat(dir); {
-		case lstat.IsDir(): //是文件夹，跳过
-			err = nil
-		case lstat.Mode()&os.ModeSymlink != 0: //是软链接，删除重建
-			if err = os.Remove(dir); err == nil {
-				ok, err = mkdir(dir, perm) //重新创建
-			}
+		notExistDirs = append(notExistDirs, p)
+		c := filepath.Dir(p)
+		if c == p {
+			break
 		}
+		p = c
 	}
+	slices.Reverse(notExistDirs)
 	return
 }

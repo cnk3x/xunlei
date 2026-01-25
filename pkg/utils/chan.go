@@ -74,7 +74,7 @@ func Sleep(d time.Duration, cBreaks ...<-chan struct{}) (breaked bool) {
 
 // After do when done is closed (unblocked)
 func After[T any, F ft[T]](done <-chan T, f F, cBreaks ...<-chan struct{}) {
-	go SelectDo(done, func(t T, ok bool) {
+	SelectDo(done, func(t T, ok bool) {
 		af := any(f)
 		if ft, ok := af.(func()); ok {
 			ft()

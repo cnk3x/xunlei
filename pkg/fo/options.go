@@ -28,21 +28,21 @@ func Flag(flag int) Option { return func(o *options) { o.flag = flag } }
 // FlagExcl 创建文件时候如果文件已存在则返回错误，如果同时 existOK 为 true 则忽略该错误，且什么都不会做。
 func FlagExcl(existOk bool) Option {
 	return func(o *options) {
-		o.flag, o.existOk = fr0(o.flag, os.O_EXCL), existOk
+		o.flag, o.existOk = o.flag&^fwo|os.O_EXCL, existOk
 	}
 }
 
 // 创建文件时候的 flag, 追加模式
-func FlagAppend(o *options) { o.flag = fr0(o.flag, os.O_APPEND) }
+func FlagAppend(o *options) { o.flag = o.flag&^fwo | os.O_APPEND }
 
 // 创建文件时候的 flag, 覆盖模式
-func FlagTrunc(o *options) { o.flag = fr0(o.flag, os.O_TRUNC) }
+func FlagTrunc(o *options) { o.flag = o.flag&^fwo | os.O_TRUNC }
 
 // 创建文件时候的 flag, 只写模式(write only)
-func FlagWo(o *options) { o.flag = fr1(o.flag, os.O_WRONLY) }
+func FlagWo(o *options) { o.flag = o.flag&^frw | os.O_WRONLY }
 
 // 创建文件时候的 flag, 读写模式 (read and write)
-func FlagRw(o *options) { o.flag = fr1(o.flag, os.O_RDWR) }
+func FlagRw(o *options) { o.flag = o.flag&^frw | os.O_RDWR }
 
 // 从文件中获取权限信息，设置到新文件中，只在新创建的文件中生效
 func PermFrom(r *os.File) Option {
@@ -53,5 +53,8 @@ func PermFrom(r *os.File) Option {
 	}
 }
 
-func fr0(src int, newFlag int) int { return src&^(os.O_APPEND|os.O_TRUNC|os.O_EXCL) | newFlag }
-func fr1(src int, newFlag int) int { return src&^(os.O_RDWR|os.O_WRONLY) | newFlag }
+const fwo = os.O_APPEND | os.O_TRUNC | os.O_EXCL
+const frw = os.O_RDWR | os.O_WRONLY
+
+// FlagRepl 从 src 中清理 mask 中指定的 flag, 替换成 new (src&^mask | new)
+func FlagRepl(src, mask, new int) int { return src&^mask | new }

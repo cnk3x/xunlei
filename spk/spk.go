@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/cnk3x/xunlei/pkg/log"
+	"github.com/cnk3x/xunlei/pkg/vms/sys"
 	"github.com/ulikunitz/xz"
 )
 
@@ -52,7 +53,7 @@ func Extract(ctx context.Context, src io.Reader, dstDir string) (err error) {
 					return
 				}()
 
-				slog.Log(ctx, log.ErrDebug(err), "extract package", "perm", perm, "target_dir", dstDir, "name", h.Name, "err", err)
+				slog.Log(ctx, log.ErrDebug(err), "extract package", "perm", sys.Perm2s(perm), "target_dir", dstDir, "name", h.Name, "err", err)
 				return
 			}, Xz), io.EOF)
 		}

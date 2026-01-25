@@ -47,7 +47,7 @@ func Links(files ...string) Option {
 			mOpts := sys.LinkOptions{
 				Source:   file,
 				Optional: true,
-				DirMode:  0777,
+				DirMode:  0o777,
 			}
 			ro.links = append(ro.links, mOpts)
 		}
@@ -72,7 +72,7 @@ func Symlink(source, target string) Option {
 			Source:   source,
 			Target:   target,
 			Optional: true,
-			DirMode:  0777,
+			DirMode:  0o777,
 		})
 	}
 }

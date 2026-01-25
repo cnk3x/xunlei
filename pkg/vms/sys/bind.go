@@ -19,6 +19,10 @@ func Binds(ctx context.Context, items []BindOptions) (undo Undo, err error) {
 	return doMulti(ctx, items, Bind)
 }
 
+func BindsTask(ctx context.Context, items ...BindOptions) func() (undo Undo, err error) {
+	return func() (undo Undo, err error) { return Binds(ctx, items) }
+}
+
 func BindRs(ctx context.Context, root string, items []BindOptions) (undo Undo, err error) {
 	for i := range items {
 		if items[i].Target == "" {
@@ -28,29 +32,38 @@ func BindRs(ctx context.Context, root string, items []BindOptions) (undo Undo, e
 	return doMulti(ctx, items, Bind)
 }
 
+func BindRsTask(ctx context.Context, root string, items ...BindOptions) func() (undo Undo, err error) {
+	return func() (undo Undo, err error) { return BindRs(ctx, root, items) }
+}
+
 // 绑定文件夹
 func Bind(ctx context.Context, m BindOptions) (undo Undo, err error) {
-	src := m.Source
-
 	bq := utils.BackQueue(&undo, &err)
 	defer bq.ErrDefer()
 
-	if src, err = filepath.EvalSymlinks(src); err == nil {
-		var dirUndo Undo
-		if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
-			bq.Put(dirUndo)
-			if err = syscall.Mount(src, m.Target, "", syscall.MS_BIND, ""); err == nil {
-				bq.Put(mkUnmount(ctx, m.Target, "unbind"))
-			}
+	real, e := filepath.EvalSymlinks(m.Source)
+	err = func() (err error) {
+		if err = e; err != nil {
+			return
 		}
-	}
 
-	attrs := []slog.Attr{
+		u, e := Mkdir(ctx, m.Target, 0o777, true)
+		if err = e; err != nil {
+			return
+		}
+		bq.Put(u)
+
+		if err = syscall.Mount(real, m.Target, "", syscall.MS_BIND, ""); err != nil {
+			return
+		}
+		bq.Put(mkUnmount(ctx, m.Target, "unbind"))
+		return
+	}()
+
+	err = checkErr(ctx, err, m.Optional, "bind",
 		slog.String("target", m.Target),
 		slog.String("source", m.Source),
-		slog.String("source_real", src),
-	}
-
-	err = logIt(ctx, err, m.Optional, "bind", attrs...)
+		slog.String("source_real", real),
+	)
 	return
 }

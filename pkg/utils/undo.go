@@ -55,3 +55,59 @@ func BackwardRun(fs ...func()) {
 		}
 	}
 }
+
+func QRun(qr ...func() (undo func(), err error)) (undo func(), err error) {
+	bq := BackQueue(&undo, &err)
+	defer bq.ErrDefer()
+	for _, q := range qr {
+		if q != nil {
+			u, e := q()
+			if err = e; err != nil {
+				return
+			}
+			bq.Put(u)
+		}
+	}
+	return
+}
+
+func ERun(fs ...func() error) error {
+	for _, f := range fs {
+		if f != nil {
+			if err := f(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func Fue1[T1 any](srcFn func(T1) (func(), error), t1 T1) func() (func(), error) {
+	return func() (func(), error) { return srcFn(t1) }
+}
+
+func Fue2[T1, T2 any](srcFn func(T1, T2) (func(), error), t1 T1, t2 T2) func() (func(), error) {
+	return func() (func(), error) { return srcFn(t1, t2) }
+}
+
+func Fue3[T1, T2, T3 any](srcFn func(T1, T2, T3) (func(), error), t1 T1, t2 T2, t3 T3) func() (func(), error) {
+	return func() (func(), error) { return srcFn(t1, t2, t3) }
+}
+
+func Fue4[T1, T2, T3, T4 any](srcFn func(T1, T2, T3, T4) (func(), error), t1 T1, t2 T2, t3 T3, t4 T4) func() (func(), error) {
+	return func() (func(), error) { return srcFn(t1, t2, t3, t4) }
+}
+
+func Fue4r[T1, T2, T3, T4 any](srcFn func(T1, T2, T3, ...T4) (func(), error), t1 T1, t2 T2, t3 T3, t4 ...T4) func() (func(), error) {
+	return func() (func(), error) { return srcFn(t1, t2, t3, t4...) }
+}
+
+func Fe1[T1 any](srcFn func(T1) error, t1 T1) func() error {
+	return func() error { return srcFn(t1) }
+}
+
+func Fnu(fn func() error) func() (func(), error) {
+	return func() (func(), error) {
+		return nil, fn()
+	}
+}

@@ -3,8 +3,8 @@ package xunlei
 import (
 	"cmp"
 	"fmt"
-	"log/slog"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,11 +27,11 @@ type Config struct {
 	DashboardPassword string `usage:"网页访问的密码" env:"XL_DASHBOARD_PASSWORD"`  //网页访问的密码
 
 	//jail 模式
-	Root        string   `flag:"r" usage:"主目录" env:"XL_ROOT"`
+	Root        string   `flag:"r" usage:"主目录，非根目录时“/”需要 root 权限执行" env:"XL_ROOT"`
 	DirDownload []string `flag:"d" usage:"下载保存文件夹，可多次指定，需确保有权限访问" env:"XL_DIR_DOWNLOAD"`
 	DirData     string   `flag:"D" usage:"程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息" env:"XL_DIR_DATA"` //程序数据保存文件夹，其下'.drive'文件夹中，存储了登录的账号，下载进度等信息
-	Uid         int      `flag:"u" usage:"运行核心的UID" env:"XL_UID"`
-	Gid         int      `flag:"g" usage:"运行核心的GID" env:"XL_GID"`
+	Uid         int      `flag:"u" usage:"运行核心的UID，需要 root 权限执行" env:"XL_UID"`
+	Gid         int      `flag:"g" usage:"运行核心的GID，需要 root 权限执行" env:"XL_GID"`
 
 	//核心设置
 	SpkUrl           string `usage:"下载链接" env:"XL_SPK"`
@@ -42,40 +42,37 @@ type Config struct {
 	//全局设置
 	Debug bool   `usage:"调试模式，调试模式下，失败也不会自动退出，以便于追踪错误，在此模式行，日志等级自动调整为'debug'" env:"XL_DEBUG"`
 	Log   string `usage:"日志等级，可选 debug，info，warn，error" env:"XL_LOG"`
+
+	Rootless bool `usage:"无超级用户（root）权限运行，需自行解决权限问题，在此模式下，将忽略 --root, --uid, --gid 的设置" env:"XL_ROOTLESS"`
+	Init     bool `usage:"手动处理依赖权限，需要 root 权限执行"`
 }
 
+// 配置检查
 func ConfigCheck(cfg *Config) (err error) {
-	cfg.DashboardPort = cmp.Or(cfg.DashboardPort, 2345)
-	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)
 
-	if cfg.Root, err = filepath.Abs(cmp.Or(cfg.Root, "xunlei")); err != nil {
-		slog.Error("无法获取绝对路径", "root", cfg.Root, "err", err)
-		return
-	}
+	//解决冲突设置
+	cfg.Root = utils.Iif(cfg.Rootless || cfg.Init, "/", cfg.Root)
 
-	cfg.DirData = cmp.Or(cfg.DirData, filepath.Join(cfg.Root, "data"))
-	if cfg.DirData, err = filepath.Abs(cfg.DirData); err != nil {
-		return
-	}
+	//设置默认值
+	cfg.DashboardPort = cmp.Or(cfg.DashboardPort, 2345) //端口默认2345
+	cfg.SpkUrl = cmp.Or(cfg.SpkUrl, spk.DownloadUrl)    //下载链接
 
-	var dirDownloads []string
-	for _, dir := range cfg.DirDownload {
-		for d := range strings.SplitSeq(dir, ":") {
-			if d = strings.TrimSpace(d); d != "" {
-				dirDownloads = append(dirDownloads, d)
-			}
-		}
-	}
-	cfg.DirDownload = dirDownloads
-
+	cfg.Root = cmp.Or(cfg.Root, "xunlei")                              //根目录默认 ./xunlei
+	cfg.DirData = cmp.Or(cfg.DirData, filepath.Join(cfg.Root, "data")) //数据默认 ${root}/data
 	if len(cfg.DirDownload) == 0 {
-		cfg.DirDownload = utils.Array(filepath.Join(cfg.Root, "downloads"))
+		cfg.DirDownload = []string{filepath.Join(cfg.Root, "downloads")} //下载默认 ${root}/downloads
 	}
 
-	if cfg.DirDownload, err = utils.Replace(cfg.DirDownload, filepath.Abs); err != nil {
-		slog.Error("无法获取绝对路径", "dir_download", cfg.DirDownload, "err", err)
-		return
+	//处理路径成绝对路径
+	abs, e := fAbs()
+	if e != nil {
+		return e
 	}
+	cfg.Root = abs(cfg.Root)
+	cfg.DirData = abs(cfg.DirData)
+	cfg.DirDownload = pList(cfg.DirDownload, abs)
+
+	cfg.Log = utils.Iif(cfg.Debug || cfg.Init, "debug", cfg.Log)
 	return
 }
 
@@ -91,7 +88,7 @@ func ConfigPrint(cfg *Config, fPrint func(string)) (cline []string) {
 	fPrintf("DASHBOARD_USERNAME: %s", cfg.DashboardUsername)
 	fPrintf("DASHBOARD_PASSWORD: %s", utils.PasswordMask(cfg.DashboardPassword))
 	for i, dir := range cfg.DirDownload {
-		fPrintf("DIR_DOWNLOAD[%d]: %s", i+1, dir)
+		fPrintf("DIR_DOWNLOAD[%d]: %s", i, dir)
 	}
 	fPrintf("DIR_DATA: %s", cfg.DirData)
 	fPrintf("UID: %d", cfg.Uid)
@@ -102,5 +99,31 @@ func ConfigPrint(cfg *Config, fPrint func(string)) (cline []string) {
 	fPrintf("PREVENT_UPDATE: %t", cfg.PreventUpdate)
 	fPrintf("LOG: %s", cfg.Log)
 	fPrintf("DEBUG: %t", cfg.Debug)
+	return
+}
+
+// 生成一个无error返回的绝对路径解析器, (pwd 必须是绝对路径)
+func fAbs() (func(string) string, error) {
+	wd, e := os.Getwd() //尝试获取当前目录
+	if e != nil {
+		return nil, fmt.Errorf("get wd fail: %w", e)
+	}
+	return func(p string) string {
+		if filepath.IsAbs(p) {
+			return filepath.Clean(p)
+		}
+		return filepath.Join(wd, p)
+	}, nil
+}
+
+// 冒号分割路径, 返回分割后的路径的绝对路径数组
+func pList(src []string, absFn func(string) string) (dst []string) {
+	for _, p := range src {
+		for d := range strings.SplitSeq(p, ":") {
+			if d = strings.TrimSpace(d); d != "" {
+				dst = append(dst, absFn(d))
+			}
+		}
+	}
 	return
 }

@@ -5,5 +5,5 @@ build::
 	aarch64-linux-gnu-gcc main.c -o $(TARGET)arm64 -O2 -s
 
 build_static::
-	gcc main.c -o $(TARGET)amd64 -static -O2 -s
-	aarch64-linux-gnu-gcc main.c -o $(TARGET)arm64 -static -O2 -s
+	gcc main.c -o $(TARGET)amd64-static -static -O2 -s
+	aarch64-linux-gnu-gcc main.c -o $(TARGET)arm64-static -static -O2 -s

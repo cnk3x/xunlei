@@ -1,8 +1,10 @@
 package fo
 
 import (
+	"bufio"
 	"cmp"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -18,12 +20,12 @@ func openFile(name string, process Process, defaultFlag int, fOpts ...Option) (e
 	}
 
 	if opts.flag&os.O_CREATE != 0 {
-		if err = os.MkdirAll(filepath.Dir(name), cmp.Or(opts.dirPerm, 0777)); err != nil {
+		if err = os.MkdirAll(filepath.Dir(name), cmp.Or(opts.dirPerm, 0o777)); err != nil {
 			return
 		}
 	}
 
-	f, e := os.OpenFile(name, opts.flag, cmp.Or(opts.perm, 0666))
+	f, e := os.OpenFile(name, opts.flag, cmp.Or(opts.perm, 0o666))
 	if e != nil && !(opts.existOk && os.IsExist(e)) {
 		err = e
 		return
@@ -66,18 +68,37 @@ func Content[T ~string | ~[]byte](content T) Process {
 	return func(w *os.File) (err error) { return utils.Eol(w.Write([]byte(content))) }
 }
 
-// 将内容行写入到打开的文件
+// 将内容行按行写入到打开的文件（末尾换行）
 func Lines[T ~string | ~[]byte](lines ...T) Process {
 	return func(w *os.File) (err error) {
 		for _, line := range lines {
 			if _, err = w.Write([]byte(line)); err != nil {
 				return
 			}
-			if len(lines) > 1 {
-				if _, err = w.Write([]byte("\n")); err != nil {
-					return
-				}
+			if _, err = w.Write([]byte("\n")); err != nil {
+				return
 			}
+		}
+		return
+	}
+}
+
+// 逐行从文件读取文本
+func LineRead(lineRd func(string) error) Process {
+	return func(f *os.File) (err error) {
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			if err = lineRd(scanner.Text()); err != nil {
+				break
+			}
+		}
+
+		if err == fs.SkipAll || err == io.EOF {
+			err = nil
+		}
+
+		if err == nil {
+			err = scanner.Err()
 		}
 		return
 	}

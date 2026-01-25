@@ -5,14 +5,17 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/cnk3x/xunlei/pkg/fo"
 	"github.com/cnk3x/xunlei/pkg/utils"
+	"github.com/cnk3x/xunlei/pkg/vms/sys"
 )
 
 var DownloadUrl = utils.Iif(runtime.GOARCH == "amd64",
@@ -66,7 +69,18 @@ func download_http(ctx context.Context, spkUrl string, dir string) (err error) {
 	req.Header.Set("priority", "u=0, i")
 	req.Header.Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
 
-	cli := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	cli := &http.Client{
+		Timeout: time.Second * 60,
+		Transport: &http.Transport{
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			DialContext:           (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 10 * time.Second}).DialContext,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 	var resp *http.Response
 	if resp, err = cli.Do(req); err != nil {
 		return
@@ -100,7 +114,7 @@ func allExists(ctx context.Context, dir string) bool {
 			slog.DebugContext(ctx, "check spk fail", "file", f, "err", err)
 			return false
 		}
-		slog.DebugContext(ctx, "check spk", "perm", stat.Mode().Perm().String(), "size", utils.HumanBytes(stat.Size()), "modtime", stat.ModTime(), "file", f)
+		slog.DebugContext(ctx, "check spk", "perm", sys.Perm2s(stat.Mode()), "size", utils.HumanBytes(stat.Size()), "modtime", stat.ModTime(), "file", f)
 	}
 	return true
 }

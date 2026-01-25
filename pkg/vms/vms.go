@@ -159,16 +159,13 @@ func chroot(ctx context.Context, root string) (rollback func(), err error) {
 }
 
 func chuser(ctx context.Context, uid, gid int) (rollback func(), err error) {
-	slog.InfoContext(ctx, "chuser start", "uid", uid, "gid", gid)
-	defer slog.InfoContext(ctx, "chuser done")
-
 	bq := utils.BackQueue(&rollback, &err)
 	defer bq.ErrDefer()
 
-	bq.Put(func() { slog.InfoContext(ctx, "chuser rollback done") })
-	defer bq.Put(func() { slog.InfoContext(ctx, "chuser rollback start") })
-
 	if uid > 0 || gid > 0 {
+		slog.InfoContext(ctx, "chuser start", "uid", uid, "gid", gid)
+		defer slog.InfoContext(ctx, "chuser done")
+
 		if err = errcheck(ctx, slog.LevelDebug, "check root", checkUid("chroot")); err != nil {
 			return
 		}
@@ -206,4 +203,4 @@ func checkUid(name string) (err error) {
 	return
 }
 
-func RootRequired(root string) bool { return root != "" && root != "/" }
+func RootRequired(root string) bool { return root != "/" }

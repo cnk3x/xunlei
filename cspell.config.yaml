@@ -36,7 +36,12 @@ words:
   - nasxunlei
   - newname
   - NEWNS
+  - NEWPID
+  - NEWUTS
+  - NODEV
+  - NOEXEC
   - noninteractive
+  - NOSUID
   - nsynobios
   - oldname
   - PKGDEST
