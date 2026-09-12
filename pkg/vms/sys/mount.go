@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"syscall"
@@ -38,8 +39,24 @@ func Mount(ctx context.Context, m MountOptions) (undo Undo, err error) {
 	var dirUndo Undo
 	if dirUndo, err = Mkdir(ctx, m.Target, 0777); err == nil {
 		bq.Put(dirUndo)
-		if err = syscall.Mount(m.Source, m.Target, m.Fstype, m.Flags, m.Data); err == nil {
+		err = syscall.Mount(m.Source, m.Target, m.Fstype, m.Flags, m.Data)
+		if err == nil {
 			bq.Put(mkUnmount(ctx, m.Target, "unmount"))
+		} else if m.Fstype == "devtmpfs" && err == syscall.ENODEV {
+			// Some minimal/custom kernels are built without CONFIG_DEVTMPFS.
+			// In that case reuse the container's existing /dev recursively,
+			// including child mounts such as /dev/pts and /dev/shm.
+			devtmpfsErr := err
+			err = syscall.Mount("/dev", m.Target, "", uintptr(syscall.MS_BIND|syscall.MS_REC), "")
+			if err == nil {
+				slog.WarnContext(ctx, "devtmpfs unavailable, fallback to rbind /dev",
+					slog.String("target", m.Target),
+					slog.String("err", devtmpfsErr.Error()))
+				bq.Put(mkUnmount(ctx, m.Target, "unmount"))
+			} else {
+				err = fmt.Errorf("mount devtmpfs failed: %v; fallback rbind /dev failed: %w",
+					devtmpfsErr, err)
+			}
 		}
 	}
 
